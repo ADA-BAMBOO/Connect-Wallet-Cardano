@@ -36,6 +36,11 @@ yarn-error.log*
 # dự án cần biến môi trường nào. Đừng bao giờ đặt key thật vào đây.
 !.env.example
 
+# Claude Code — cấu hình cá nhân (quyền hạn, ghi đè riêng máy này).
+# Không commit: quyền như `git push` là quyết định tin cậy của từng người,
+# không nên đi theo repo sang máy người khác.
+.claude/settings.local.json
+
 # vercel
 .vercel
 
