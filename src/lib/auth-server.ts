@@ -1,41 +1,81 @@
 import "server-only";
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
+
+import { safeEqual } from "@/lib/constant-time";
+import { getRedis, isRedisConfigured } from "@/lib/redis";
 
 /**
- * Hạ tầng tối giản cho luồng "đăng nhập bằng ví" (Sign-In With Cardano).
- *
- * LƯU Ý CHO PRODUCTION: nonce ở đây lưu trong RAM của tiến trình, sẽ mất khi
- * restart và không chia sẻ được giữa nhiều instance. Thực tế hãy thay bằng
- * Redis/DB có TTL. Phần ký & xác minh chữ ký thì đã đúng chuẩn.
+ * Hạ tầng cho luồng "đăng nhập bằng ví" (Sign-In With Cardano).
  */
 
 const NONCE_TTL_MS = 5 * 60 * 1000; // 5 phút
 export const SESSION_COOKIE = "cardano_session";
 export const SESSION_TTL_SECONDS = 60 * 60; // 1 giờ
 
-type NonceEntry = { nonce: string; expiresAt: number };
+const nonceKey = (address: string) => `auth:nonce:${address}`;
 
-const nonceStore = new Map<string, NonceEntry>();
+/* ------------------------------------------------------------------ */
+/* Nonce store                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Dự phòng khi chưa cấu hình Redis.
+ *
+ * Nonce nằm trong RAM của tiến trình thì mất sau mỗi lần restart và không chia sẻ
+ * được giữa nhiều instance — sau load balancer, người dùng xin nonce ở instance A
+ * rồi gửi chữ ký tới instance B sẽ luôn bị từ chối. Chấp nhận được khi chạy một
+ * tiến trình lúc dev; production hãy đặt REDIS_URL.
+ */
+type NonceEntry = { nonce: string; expiresAt: number };
+const memoryStore = new Map<string, NonceEntry>();
 
 function pruneExpired() {
   const now = Date.now();
-  for (const [key, entry] of nonceStore) {
-    if (entry.expiresAt <= now) nonceStore.delete(key);
+  for (const [key, entry] of memoryStore) {
+    if (entry.expiresAt <= now) memoryStore.delete(key);
   }
 }
 
-export function saveNonce(address: string, nonce: string) {
+export async function saveNonce(address: string, nonce: string): Promise<void> {
+  if (isRedisConfigured()) {
+    try {
+      await getRedis().set(nonceKey(address), nonce, "PX", NONCE_TTL_MS);
+      return;
+    } catch (error) {
+      // Redis chết thì rơi về RAM: thà đăng nhập được trên một instance còn hơn
+      // hỏng hẳn. Việc chống replay vẫn nguyên vẹn vì nonce vẫn dùng một lần.
+      console.error("[auth] không ghi được nonce vào Redis, dùng bộ nhớ tiến trình:", error);
+    }
+  }
+
   pruneExpired();
-  nonceStore.set(address, { nonce, expiresAt: Date.now() + NONCE_TTL_MS });
+  memoryStore.set(address, { nonce, expiresAt: Date.now() + NONCE_TTL_MS });
 }
 
-/** Lấy nonce ra và xoá ngay — nonce chỉ dùng được một lần (chống replay). */
-export function consumeNonce(address: string): string | null {
+/**
+ * Lấy nonce ra và xoá ngay — nonce chỉ dùng được MỘT LẦN (chống replay).
+ *
+ * Trên Redis dùng GETDEL để đọc và xoá trong một thao tác nguyên tử. Nếu tách làm
+ * GET rồi DEL, hai request đồng thời đều đọc được cùng một nonce trước khi nó bị
+ * xoá — và thế là chống replay không còn tác dụng.
+ */
+export async function consumeNonce(address: string): Promise<string | null> {
+  if (isRedisConfigured()) {
+    try {
+      return await getRedis().getdel(nonceKey(address));
+    } catch (error) {
+      console.error("[auth] không đọc được nonce từ Redis:", error);
+      // Không rơi về RAM ở đây: nonce đã ghi vào Redis thì không có trong RAM, mà
+      // trả về một giá trị từ nguồn khác chỉ tạo ra nhầm lẫn.
+      return null;
+    }
+  }
+
   pruneExpired();
-  const entry = nonceStore.get(address);
+  const entry = memoryStore.get(address);
   if (!entry) return null;
-  nonceStore.delete(address);
+  memoryStore.delete(address);
   return entry.expiresAt > Date.now() ? entry.nonce : null;
 }
 
@@ -120,9 +160,7 @@ export function readSessionToken(token: string | undefined): Session | null {
   const expected = createHmac("sha256", secret).update(payload).digest("base64url");
 
   // So sánh chống timing attack; độ dài khác nhau thì loại luôn.
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  if (!safeEqual(signature, expected)) return null;
 
   try {
     const session = JSON.parse(Buffer.from(payload, "base64url").toString()) as Session;

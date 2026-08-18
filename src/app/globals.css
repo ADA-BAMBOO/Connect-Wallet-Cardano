@@ -1,11 +1,81 @@
 @import "tailwindcss";
 
-/* Demo này cố tình chỉ có một giao diện tối, nên màu được khai báo cố định
-   thay vì đổi theo prefers-color-scheme. */
+/* Font do next/font nạp ở layout.tsx — `inline` để utility trỏ thẳng vào biến đó. */
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* ==================================================================
+   BẢNG MÀU
+
+   Lấy đúng 4 màu của bộ nhận diện:
+     Primary Green   #1F8F3A
+     Light Green     #A3C644
+     Deep Tech Blue  #0D1F2D
+     Black           #000000
+
+   Các bậc còn lại chỉ là sáng/tối hơn của chính 4 màu đó (đổi lightness,
+   giữ nguyên hue) — không thêm sắc mới vào bộ nhận diện.
+
+   Ngoại lệ có chủ đích: `warn` (hổ phách) và `danger` (đỏ). Đây là app
+   chuyển tiền thật; cảnh báo "ví đang ở Mainnet" hay "gửi nhầm mạng là mất
+   tiền" không được phép trùng màu với trạng thái thành công. Bộ nhận diện
+   không có màu nào đảm nhiệm vai trò này nên phải mượn ngoài — dùng đúng hai
+   chỗ đó, không dùng để trang trí.
+   ================================================================== */
+@theme {
+  /* Xanh lá chủ đạo — 500 là màu thương hiệu */
+  --color-brand-100: #cdebd5;
+  --color-brand-200: #9ad7ad;
+  --color-brand-300: #6ccb88;
+  --color-brand-400: #3ec463;
+  --color-brand-500: #1f8f3a;
+  --color-brand-600: #1a7a31;
+  --color-brand-700: #145f26;
+  --color-brand-800: #0e441b;
+  --color-brand-900: #092e12;
+
+  /* Xanh lá sáng (lá tre) — 500 là màu thương hiệu */
+  --color-leaf-200: #e2f0b8;
+  --color-leaf-300: #c9e186;
+  --color-leaf-400: #b6d75f;
+  --color-leaf-500: #a3c644;
+  --color-leaf-600: #8aab33;
+  --color-leaf-700: #6d8926;
+
+  /* Nền — Deep Tech Blue kéo dần về Black */
+  --color-ink-950: #05101a;
+  --color-ink-900: #0a1926;
+  --color-ink-850: #0d1f2d;
+  --color-ink-800: #12293a;
+  --color-ink-700: #1b3a4f;
+  --color-ink-600: #274d66;
+
+  /* Vai trò ngữ nghĩa — component dùng tên này, không dùng hex trực tiếp */
+  --color-canvas: #050e15;
+  --color-surface: #0c1a26;
+  --color-surface-2: #112433;
+  --color-hairline: #1c3243;
+  --color-hairline-strong: #26445a;
+  --color-fg: #e7f0ea;
+  --color-fg-muted: #93a8b4;
+  --color-fg-subtle: #7b90a0;
+
+  /* Cảnh báo / nguy hiểm (xem ghi chú ở trên) */
+  --color-warn-400: #f5c860;
+  --color-warn-500: #e0a32a;
+  --color-danger-400: #ff8a8f;
+  --color-danger-500: #d23b43;
+  --color-danger-600: #b32a32;
+
+  --radius-card: 1rem;
+
+  /* Một nhịp chuyển động duy nhất cho cả app */
+  --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ================================================================== */
 
 html {
   color-scheme: dark;
@@ -13,6 +83,7 @@ html {
 
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 
 code,
@@ -20,15 +91,58 @@ code,
   font-family: var(--font-mono), ui-monospace, monospace;
 }
 
+::selection {
+  background: color-mix(in oklab, var(--color-brand-500) 45%, transparent);
+  color: var(--color-fg);
+}
+
+/*
+  Focus ring dùng chung cho MỌI phần tử tương tác.
+  Đặt ở tầng global thay vì từng component: chỉ cần một chỗ quên là người dùng
+  bàn phím mất dấu con trỏ. Màu lá sáng để nổi trên cả nền tối lẫn nút xanh.
+*/
+:focus-visible {
+  outline: 2px solid var(--color-leaf-500);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
 /* Popup hiện ra mềm mại thay vì nhảy cụp vào màn hình */
 @keyframes modal-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(10px) scale(0.985);
   }
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* Nội dung mới xuất hiện trong luồng thanh toán — chỉ dịch chuyển transform/opacity */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise-in 260ms var(--ease-brand) both;
+}
+
+/* Vệt sáng nền, dao động rất chậm để nền không "chết" mà cũng không cướp chú ý */
+@keyframes ambient-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, 2.5rem, 0) scale(1.08);
   }
 }
 
@@ -43,10 +157,26 @@ code,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, white 12%, transparent);
+  background: var(--color-hairline);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklab, white 20%, transparent);
+  background: var(--color-hairline-strong);
+}
+
+/*
+  Tôn trọng prefers-reduced-motion ở tầng global. Không tắt hẳn transition —
+  cắt về 1ms giữ được phản hồi tức thì của trạng thái hover/pressed, chỉ bỏ
+  phần chuyển động.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }

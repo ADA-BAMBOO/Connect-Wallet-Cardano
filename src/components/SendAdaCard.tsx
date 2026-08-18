@@ -166,13 +166,13 @@ export function SendAdaCard() {
           {busy ? "Đang xử lý…" : "Gửi giao dịch"}
         </Button>
 
-        <p className="text-xs leading-relaxed text-slate-500">
+        <p className="text-xs leading-relaxed text-fg-subtle">
           Cần ADA testnet? Lấy miễn phí tại{" "}
           <a
             href="https://docs.cardano.org/cardano-testnets/tools/faucet/"
             target="_blank"
             rel="noreferrer"
-            className="text-sky-400 underline underline-offset-2"
+            className="text-brand-400 underline underline-offset-2"
           >
             Cardano Testnet Faucet
           </a>

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   // Nonce dùng một lần: lấy ra là xoá, dù xác minh thành công hay không.
-  const nonce = consumeNonce(address);
+  const nonce = await consumeNonce(address);
   if (!nonce) {
     return NextResponse.json(
       { error: "Nonce đã hết hạn hoặc không tồn tại. Hãy thử đăng nhập lại." },

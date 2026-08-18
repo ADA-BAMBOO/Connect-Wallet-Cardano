@@ -15,8 +15,8 @@ const WalletApp = dynamic(() => import("./WalletApp"), {
   ssr: false,
   loading: () => (
     <div className="flex flex-1 items-center justify-center py-32">
-      <div className="flex items-center gap-3 text-slate-500">
-        <Spinner />
+      <div className="flex items-center gap-3 text-fg-muted">
+        <Spinner className="text-brand-400" />
         <span className="text-sm">Đang khởi tạo kết nối ví…</span>
       </div>
     </div>

@@ -8,16 +8,29 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "migrate": "node scripts/migrate.mjs",
+    "verify:payment": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-payment.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",
     "verify:api": "node scripts/verify-api.mjs",
     "verify:browser": "node scripts/verify-browser-login.mjs",
     "verify:binding": "node scripts/verify-this-binding.mjs",
-    "verify:nft": "node scripts/verify-nft-image.mjs"
+    "verify:nft": "node scripts/verify-nft-image.mjs",
+    "resolve:stablecoins": "node scripts/resolve-stablecoin-units.mjs",
+    "mint:test-stablecoins": "node scripts/mint-test-stablecoins.mjs",
+    "verify:onchain": "node scripts/verify-onchain-payment.mjs",
+    "verify:faucet": "node scripts/verify-faucet.mjs",
+    "verify:ui": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-ui.mjs",
+    "verify:integration": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-integration.mjs"
   },
   "dependencies": {
     "@meshsdk/core": "1.8.14",
     "@meshsdk/react": "1.8.14",
+    "ioredis": "^6.0.0",
     "next": "16.3.1",
+    "pg": "^8.23.0",
+    "qrcode-generator": "^2.0.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1"
@@ -26,12 +39,15 @@
     "libsodium-wrappers-sumo": "0.7.15"
   },
   "devDependencies": {
+    "@next/env": "^16.3.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

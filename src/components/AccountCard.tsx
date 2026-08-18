@@ -53,7 +53,7 @@ export function AccountCard() {
           <Badge tone={network.isMainnet ? "warning" : "info"}>
             <span
               className={`h-1.5 w-1.5 rounded-full ${
-                network.isMainnet ? "bg-amber-400" : "bg-sky-400"
+                network.isMainnet ? "bg-warn-400" : "bg-brand-400"
               }`}
             />
             {network.label}
@@ -71,22 +71,29 @@ export function AccountCard() {
           </Alert>
         )}
 
-        <div className="rounded-xl border border-white/10 bg-gradient-to-br from-sky-500/10 to-transparent px-5 py-4">
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Số dư</div>
+        {/*
+          Số dư dùng tabular-nums: giá trị được đọc lại liên tục từ ví, chữ số
+          không đều sẽ làm cả dòng nhảy qua nhảy lại mỗi lần cập nhật.
+        */}
+        <div
+          className="rounded-2xl border border-brand-500/25 bg-gradient-to-br from-brand-500/15 via-brand-500/5
+            to-transparent px-5 py-4"
+        >
+          <div className="text-xs font-medium uppercase tracking-wide text-fg-muted">Số dư</div>
           <div className="mt-1 flex items-baseline gap-2">
             {lovelace === undefined ? (
-              <Spinner className="text-slate-500" />
+              <Spinner className="text-fg-subtle" />
             ) : (
               <>
-                <span className="font-mono text-3xl font-semibold tabular-nums text-white">
+                <span className="font-mono text-3xl font-semibold tabular-nums text-fg sm:text-4xl">
                   {lovelaceToAda(lovelace, 2)}
                 </span>
-                <span className="text-lg font-medium text-slate-400">ADA</span>
+                <span className="text-lg font-medium text-brand-300">ADA</span>
               </>
             )}
           </div>
           {lovelace !== undefined && (
-            <div className="mt-1 font-mono text-xs text-slate-500">
+            <div className="mt-1 font-mono text-xs tabular-nums text-fg-subtle">
               {BigInt(lovelace).toLocaleString("en-US")} lovelace
               {utxoCount !== null && ` · ${utxoCount} UTxO`}
             </div>
@@ -107,7 +114,7 @@ export function AccountCard() {
           />
         </div>
 
-        <p className="text-xs leading-relaxed text-slate-500">
+        <p className="text-xs leading-relaxed text-fg-subtle">
           Địa chỉ payment có thể đổi theo từng giao dịch, nên <strong>địa chỉ stake</strong> mới là
           định danh ổn định của một ví — đó là lý do phần đăng nhập bên dưới ký bằng địa chỉ stake.
         </p>

@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     );
   }
 
-  saveNonce(address, nonce);
+  await saveNonce(address, nonce);
 
   return NextResponse.json({ nonce });
 }

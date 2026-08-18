@@ -116,12 +116,81 @@ export function formatQuantity(quantity: string, decimals = 0): string {
   }
 }
 
-/** Sinh màu ổn định từ một chuỗi — dùng làm avatar/placeholder cho NFT. */
-export function colorFromString(value: string): string {
+function hashString(value: string): number {
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
     hash = (hash << 5) - hash + value.charCodeAt(i);
     hash |= 0;
   }
-  return `hsl(${Math.abs(hash) % 360} 70% 55%)`;
+  return Math.abs(hash);
+}
+
+/*
+ * Swatch sinh từ policy ID — dùng làm placeholder cho NFT và token chưa có ảnh.
+ *
+ * Bản cũ là `hsl(hue 70% 55%)`: hue thay đổi thì ĐỘ CHÓI cũng thay đổi theo, vì
+ * ở cùng một lightness thì vàng chói gấp nhiều lần lam. Hệ quả là hai thứ cùng
+ * hỏng — dải neon vàng/lơ phá tông giao diện tối, và chữ trắng đặt lên nửa vòng
+ * màu sáng tụt xuống dưới 3:1.
+ *
+ * Ở đây lightness được dò riêng cho từng hue sao cho MỌI swatch có cùng độ chói
+ * (~0.105). Hue vẫn chạy đủ 360° để phân biệt asset, nhưng độ chói không đổi:
+ * swatch nào cũng đủ tối để hợp nền, và chữ sáng luôn đạt ≥5.8:1 trên tất cả.
+ */
+const SWATCH_SATURATION = 0.58;
+const SWATCH_LUMINANCE = 0.105;
+
+/** Màu chữ đặt lên swatch. Cố định được vì mọi swatch có cùng độ chói. */
+export const SWATCH_FOREGROUND = "#e7f0ea";
+
+/** Sinh màu ổn định từ một chuỗi — dùng làm avatar/placeholder cho NFT. */
+export function colorFromString(value: string): string {
+  const hue = hashString(value) % 360;
+  const lightness = lightnessForLuminance(hue, SWATCH_LUMINANCE);
+  return `hsl(${hue} ${Math.round(SWATCH_SATURATION * 100)}% ${(lightness * 100).toFixed(1)}%)`;
+}
+
+/**
+ * Lightness nhỏ nhất khiến hue này đạt đúng độ chói mong muốn.
+ * Không có công thức đảo ngược nên chia đôi — 18 vòng là dưới 1e-5, thừa chính
+ * xác cho một giá trị CSS, và chỉ chạy một lần cho mỗi asset.
+ */
+function lightnessForLuminance(hue: number, target: number): number {
+  let low = 0;
+  let high = 1;
+
+  for (let i = 0; i < 18; i++) {
+    const mid = (low + high) / 2;
+    if (relativeLuminance(hslToRgb(hue, SWATCH_SATURATION, mid)) < target) low = mid;
+    else high = mid;
+  }
+
+  return (low + high) / 2;
+}
+
+/** Độ chói tương đối theo WCAG. */
+function relativeLuminance([r, g, b]: [number, number, number]): number {
+  const channel = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function hslToRgb(hue: number, saturation: number, lightness: number): [number, number, number] {
+  const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = lightness - c / 2;
+
+  const [r, g, b] =
+    hue < 60
+      ? [c, x, 0]
+      : hue < 120
+        ? [x, c, 0]
+        : hue < 180
+          ? [0, c, x]
+          : hue < 240
+            ? [0, x, c]
+            : hue < 300
+              ? [x, 0, c]
+              : [c, 0, x];
+
+  return [r + m, g + m, b + m];
 }

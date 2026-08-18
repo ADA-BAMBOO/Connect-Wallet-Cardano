@@ -1,0 +1,53 @@
+# Postgres + Redis cho phát triển tại máy.
+#
+#   docker compose up -d          bật
+#   docker compose logs -f        xem log
+#   docker compose down           tắt (giữ dữ liệu)
+#   docker compose down -v        tắt và XOÁ dữ liệu
+#
+# Mật khẩu ở đây cố tình để trần: đây là môi trường dev, không bao giờ dùng cho
+# production. Production thì đặt DATABASE_URL/REDIS_URL trỏ tới dịch vụ thật.
+#
+# Cổng phía host cố tình đặt lệch (5442/6389) thay vì 5432/6379: máy dev thường đã
+# có sẵn Postgres/Redis của dự án khác chiếm cổng mặc định. Vế PHẢI là cổng trong
+# container, giữ nguyên. Đổi vế trái thì nhớ sửa DATABASE_URL/REDIS_URL cho khớp.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cardano-pay-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cardano
+      POSTGRES_PASSWORD: cardano
+      POSTGRES_DB: cardano_pay
+    ports:
+      - "5442:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cardano -d cardano_pay"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: cardano-pay-redis
+    restart: unless-stopped
+    # appendonly: nonce đăng nhập và khoá watcher mất hết sau mỗi lần restart Docker
+    # thì lúc dev rất khó chịu. Dữ liệu Redis ở đây đều có TTL nên file không phình.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6389:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:

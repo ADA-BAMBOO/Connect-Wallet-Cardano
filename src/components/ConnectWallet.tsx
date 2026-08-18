@@ -61,15 +61,15 @@ export function ConnectWallet() {
     return (
       <div className="flex items-center gap-3">
         <Badge tone="success">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
           Đã kết nối
         </Badge>
-        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
+        <div className="flex min-h-10 items-center gap-2 rounded-lg border border-hairline bg-surface-2 px-3 py-1.5">
           {current?.icon && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={current.icon} alt="" className="h-5 w-5 rounded" />
           )}
-          <span className="text-sm font-medium capitalize text-white">{name}</span>
+          <span className="text-sm font-medium capitalize text-fg">{name}</span>
         </div>
         <Button variant="secondary" size="sm" onClick={handleDisconnect}>
           Ngắt kết nối
@@ -94,13 +94,13 @@ export function ConnectWallet() {
             : "Chưa phát hiện ví nào"
         }
         footer={
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-fg-subtle">
             Ví được phát hiện qua chuẩn{" "}
             <a
               href="https://cips.cardano.org/cip/CIP-30"
               target="_blank"
               rel="noreferrer"
-              className="text-slate-400 underline underline-offset-2 hover:text-slate-200"
+              className="text-fg-muted underline underline-offset-2 hover:text-fg"
             >
               CIP-30
             </a>{" "}
@@ -117,29 +117,31 @@ export function ConnectWallet() {
                   <button
                     onClick={() => handleConnect(wallet.name)}
                     disabled={pending !== null}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition
-                          hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-transparent
+                          px-3 py-3 text-left transition-colors duration-150
+                          hover:border-hairline hover:bg-surface-2
+                          disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {wallet.icon ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={wallet.icon} alt="" className="h-9 w-9 rounded-lg" />
                     ) : (
-                      <div className="h-9 w-9 rounded-lg bg-white/10" />
+                      <div className="h-9 w-9 rounded-lg border border-hairline bg-surface-2" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium capitalize text-white">{wallet.name}</div>
+                      <div className="font-medium capitalize text-fg">{wallet.name}</div>
                       {wallet.version && (
-                        <div className="text-xs text-slate-500">v{wallet.version}</div>
+                        <div className="text-xs text-fg-subtle">v{wallet.version}</div>
                       )}
                     </div>
-                    {pending === wallet.name && <Spinner className="text-sky-400" />}
+                    {pending === wallet.name && <Spinner className="text-brand-400" />}
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
             <div className="px-2 py-3">
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-fg-muted">
                 Trình duyệt chưa cài extension ví Cardano nào. Cài một trong các ví sau rồi tải lại
                 trang:
               </p>
@@ -150,7 +152,9 @@ export function ConnectWallet() {
                       href={w.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="block rounded-lg border border-white/10 px-3 py-2 text-sm text-sky-300 transition hover:bg-white/5"
+                      className="flex min-h-11 items-center rounded-lg border border-hairline bg-surface/60 px-3
+                        text-sm text-brand-300 transition-colors duration-150
+                        hover:border-hairline-strong hover:bg-surface-2"
                     >
                       {w.name} ↗
                     </a>
@@ -161,7 +165,7 @@ export function ConnectWallet() {
           )}
 
           {error != null && (
-            <p className="mt-2 px-2 pb-1 text-sm text-rose-300">
+            <p className="mt-2 px-2 pb-1 text-sm text-danger-400">
               Không kết nối được: {describeError(error)}
             </p>
           )}

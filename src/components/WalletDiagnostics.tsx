@@ -266,9 +266,9 @@ export function WalletDiagnostics() {
         </Button>
 
         {wallets?.map((w) => (
-          <div key={w.name} className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div key={w.name} className="rounded-xl border border-hairline bg-ink-950/50 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold capitalize text-white">{w.name}</span>
+              <span className="font-semibold capitalize text-fg">{w.name}</span>
               {w.enabled ? <Badge tone="success">enable OK</Badge> : <Badge tone="danger">enable FAIL</Badge>}
               {w.enabled && (
                 <Badge tone={w.hasSignData ? "success" : "danger"}>
@@ -282,21 +282,21 @@ export function WalletDiagnostics() {
             </div>
 
             {w.enableError && (
-              <p className="mt-2 text-sm text-rose-300">enable(): {w.enableError}</p>
+              <p className="mt-2 text-sm text-danger-400">enable(): {w.enableError}</p>
             )}
 
             {w.enabled && (
               <ul className="mt-3 space-y-2">
                 {w.addresses.map((a) => (
-                  <li key={a.label} className="rounded-lg bg-white/[0.03] px-3 py-2">
+                  <li key={a.label} className="rounded-lg bg-surface px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-slate-200">{a.label}</span>
+                      <span className="text-sm font-medium text-fg">{a.label}</span>
                       {a.hex ? (
-                        <code className="font-mono text-[11px] text-slate-500">
+                        <code className="font-mono text-[11px] text-fg-subtle">
                           {truncate(a.hex, 14, 8)}
                         </code>
                       ) : (
-                        <span className="text-xs text-rose-300">{a.error}</span>
+                        <span className="text-xs text-danger-400">{a.error}</span>
                       )}
                     </div>
 
@@ -337,23 +337,23 @@ export function WalletDiagnostics() {
 
         {results.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-300">Kết quả ký</h3>
-            <ul className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/10">
+            <h3 className="text-sm font-medium text-fg">Kết quả ký</h3>
+            <ul className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline">
               {results.map((r, i) => (
-                <li key={i} className="flex items-start gap-3 bg-black/20 px-3.5 py-2.5">
+                <li key={i} className="flex items-start gap-3 bg-ink-950/50 px-3.5 py-2.5">
                   <span
                     className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                      r.ok ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                      r.ok ? "bg-brand-500/20 text-brand-300" : "bg-danger-500/20 text-danger-400"
                     }`}
                   >
                     {r.ok ? "OK" : "FAIL"}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm text-white">{r.label}</div>
-                    <div className="break-words text-xs text-slate-400">
+                    <div className="text-sm text-fg">{r.label}</div>
+                    <div className="break-words text-xs text-fg-muted">
                       {r.detail}
                       {r.code != null && (
-                        <span className="ml-1 font-mono text-slate-500">(code={r.code})</span>
+                        <span className="ml-1 font-mono text-fg-subtle">(code={r.code})</span>
                       )}
                     </div>
                   </div>

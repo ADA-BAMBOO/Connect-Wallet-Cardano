@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAssets, useNetwork, useWallet } from "@meshsdk/react";
 import { Alert, Badge, Card, Spinner } from "./ui";
-import { colorFromString, formatQuantity, parseUnit, truncate } from "@/lib/format";
+import {
+  colorFromString,
+  formatQuantity,
+  parseUnit,
+  SWATCH_FOREGROUND,
+  truncate,
+} from "@/lib/format";
 import { getNetworkInfo } from "@/lib/network";
 
 type AssetMeta = { unit: string; name?: string; images?: string[]; decimals?: number };
@@ -85,25 +91,25 @@ export function AssetsCard() {
       icon={<StackIcon />}
       action={
         assets === undefined ? (
-          <Spinner className="text-slate-500" />
+          <Spinner className="text-fg-subtle" />
         ) : (
           <Badge>{total} asset</Badge>
         )
       }
     >
       {assets === undefined ? (
-        <div className="flex items-center gap-2 py-6 text-sm text-slate-400">
+        <div className="flex items-center gap-2 py-6 text-sm text-fg-muted">
           <Spinner /> Đang đọc asset từ ví…
         </div>
       ) : total === 0 ? (
-        <p className="py-6 text-center text-sm text-slate-500">
+        <p className="py-6 text-center text-sm text-fg-subtle">
           Ví chưa có native token hay NFT nào ngoài ADA.
         </p>
       ) : (
         <div className="space-y-6">
           {nfts.length > 0 && (
             <div>
-              <h3 className="mb-3 text-sm font-medium text-slate-300">NFT ({nfts.length})</h3>
+              <h3 className="mb-3 text-sm font-medium text-fg">NFT ({nfts.length})</h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {nfts.map((asset) => {
                   const parsed = parseUnit(asset.unit);
@@ -112,7 +118,7 @@ export function AssetsCard() {
                   return (
                     <div
                       key={asset.unit}
-                      className="overflow-hidden rounded-xl border border-white/10 bg-black/20"
+                      className="overflow-hidden rounded-xl border border-hairline bg-ink-950/50"
                     >
                       <div
                         className="flex aspect-square items-center justify-center"
@@ -138,20 +144,23 @@ export function AssetsCard() {
                             onError={() => nextGateway(asset.unit)}
                           />
                         ) : (
-                          <span className="px-2 text-center text-2xl font-bold text-white/80">
+                          <span
+                            className="px-2 text-center text-2xl font-bold"
+                            style={{ color: SWATCH_FOREGROUND }}
+                          >
                             {(info?.name ?? parsed.displayName).slice(0, 2).toUpperCase()}
                           </span>
                         )}
                       </div>
                       <div className="p-2.5">
                         <div
-                          className="truncate text-sm font-medium text-white"
+                          className="truncate text-sm font-medium text-fg"
                           title={info?.name ?? parsed.displayName}
                         >
                           {info?.name ?? parsed.displayName}
                         </div>
                         <div
-                          className="mt-0.5 truncate font-mono text-[11px] text-slate-500"
+                          className="mt-0.5 truncate font-mono text-[11px] text-fg-subtle"
                           title={parsed.policyId}
                         >
                           {truncate(parsed.policyId, 8, 4)}
@@ -166,10 +175,10 @@ export function AssetsCard() {
 
           {tokens.length > 0 && (
             <div>
-              <h3 className="mb-3 text-sm font-medium text-slate-300">
+              <h3 className="mb-3 text-sm font-medium text-fg">
                 Fungible token ({tokens.length})
               </h3>
-              <ul className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/10">
+              <ul className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline">
                 {tokens.map((asset) => {
                   const parsed = parseUnit(asset.unit);
                   const info = meta[asset.unit];
@@ -177,7 +186,7 @@ export function AssetsCard() {
                   return (
                     <li
                       key={asset.unit}
-                      className="flex items-center gap-3 bg-black/20 px-3.5 py-3"
+                      className="flex items-center gap-3 bg-ink-950/50 px-3.5 py-3"
                     >
                       {tokenImage ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -191,24 +200,27 @@ export function AssetsCard() {
                         />
                       ) : (
                         <div
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white/90"
-                          style={{ background: colorFromString(parsed.policyId) }}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                          style={{
+                            background: colorFromString(parsed.policyId),
+                            color: SWATCH_FOREGROUND,
+                          }}
                         >
                           {(info?.name ?? parsed.displayName).slice(0, 2).toUpperCase()}
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-white">
+                        <div className="truncate text-sm font-medium text-fg">
                           {info?.name ?? parsed.displayName}
                         </div>
                         <div
-                          className="truncate font-mono text-[11px] text-slate-500"
+                          className="truncate font-mono text-[11px] text-fg-subtle"
                           title={parsed.policyId}
                         >
                           {truncate(parsed.policyId, 10, 6)}
                         </div>
                       </div>
-                      <div className="shrink-0 font-mono text-sm tabular-nums text-slate-200">
+                      <div className="shrink-0 font-mono text-sm tabular-nums text-fg">
                         {formatQuantity(asset.quantity, info?.decimals ?? 0)}
                       </div>
                     </li>
@@ -238,7 +250,7 @@ export function AssetsCard() {
                 </a>
                 , thêm vào <code className="font-mono">.env.local</code> rồi khởi động lại server:
               </p>
-              <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 px-3 py-2 font-mono text-[11px]">
+              <pre className="mt-2 overflow-x-auto rounded-lg bg-ink-950/70 px-3 py-2 font-mono text-[11px]">
                 BLOCKFROST_API_KEY=preprod...
               </pre>
               <p className="mt-2 text-xs opacity-80">
