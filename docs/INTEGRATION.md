@@ -5,6 +5,9 @@ Tài liệu này dành cho người ghép **dự án sản phẩm** (shop) với
 Mô hình: hai service riêng, hai domain, hai database. Shop gọi API tạo đơn, redirect
 khách sang trang thanh toán, rồi nhận webhook đã ký khi tiền về.
 
+Muốn xem luồng này chạy thật trước khi ghép? [`demo/README.md`](../demo/README.md) dựng
+một trang Kolo giả lập ở cổng riêng và chạy trọn vòng bằng hai lệnh.
+
 ```
   shop.com (Next.js sản phẩm)              pay.shop.com (repo này)
   ────────────────────────────             ────────────────────────────

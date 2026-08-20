@@ -39,6 +39,9 @@ npm run db:up      # Postgres + Redis qua Docker (cổng 5442 / 6389)
 npm run migrate    # tạo bảng
 ```
 
+Muốn xem trọn luồng shop → cổng thanh toán → shop: [`demo/README.md`](demo/README.md)
+dựng một trang Kolo giả lập ở `localhost:3100` và chạy hết vòng bằng `npm run demo:shop`.
+
 Để thử nghiệm an toàn: chuyển ví sang **Preprod** hoặc **Preview** testnet, rồi
 xin ADA miễn phí tại [Cardano Testnet Faucet](https://docs.cardano.org/cardano-testnets/tools/faucet/).
 

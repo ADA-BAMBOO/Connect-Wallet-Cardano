@@ -24,7 +24,9 @@
     "verify:i18n": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-i18n.mjs",
     "verify:wallet-calls": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-wallet-calls.mjs",
     "verify:ui": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-ui.mjs",
-    "verify:integration": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-integration.mjs"
+    "verify:integration": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-integration.mjs",
+    "demo:shop": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON demo/kolo-shop/server.ts",
+    "demo:webhook": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON demo/kolo-shop/send-test-webhook.ts"
   },
   "dependencies": {
     "@meshsdk/core": "1.8.14",

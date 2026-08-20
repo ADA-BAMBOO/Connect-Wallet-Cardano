@@ -11,6 +11,9 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // demo/ chạy thẳng bằng Node (tự bóc kiểu) nên import phải ghi rõ đuôi ".ts".
+    // Hợp lệ vì cấu hình này chỉ kiểm kiểu, không sinh file (noEmit ở trên).
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
