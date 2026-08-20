@@ -121,6 +121,14 @@ function installMockWallet({ addresses, walletName, failFirst }) {
 async function run({ label, failFirst, budget }) {
   const browser = await chromium.launch();
   const context = await browser.newContext();
+
+  /*
+   * Ghim ngôn ngữ về tiếng Việt: bộ này đếm số lần gọi CIP-30, nhưng nó nhận biết
+   * "đã kết nối xong" bằng một chuỗi tiếng Việt trên màn hình. Một bản dựng đặt
+   * DEFAULT_LOCALE=en — cấu hình hợp lệ — sẽ làm nó treo cho tới lúc hết giờ.
+   */
+  await context.addCookies([{ name: "cardano_locale", value: "vi", url: BASE }]);
+
   const page = await context.newPage();
 
   const pageErrors = [];

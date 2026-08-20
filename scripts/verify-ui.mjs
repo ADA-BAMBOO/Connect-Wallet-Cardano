@@ -89,6 +89,17 @@ const payUrl = `${BASE}/pay/${ref}`;
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 900, height: 1200 } });
 
+/*
+ * Ghim ngôn ngữ về tiếng Việt bằng cookie.
+ *
+ * Bộ này kiểm giao diện, không kiểm i18n (đã có verify:i18n lo), nên mọi chuỗi bên
+ * dưới đều viết bằng tiếng Việt. Không ghim thì một bản dựng đặt DEFAULT_LOCALE=en
+ * — cấu hình hoàn toàn hợp lệ — sẽ làm cả bộ đỏ vì trang hiện tiếng Anh.
+ */
+await page.context().addCookies([
+  { name: "cardano_locale", value: "vi", url: BASE },
+]);
+
 // Lỗi JavaScript trên trang là lỗi thật — bắt hết thay vì để trôi qua.
 const pageErrors = [];
 page.on("pageerror", (err) => pageErrors.push(err.message));
@@ -100,7 +111,13 @@ try {
   /* --- Trang chủ --- */
   const home = await page.goto(BASE, { waitUntil: "networkidle" });
   assert("trang chủ trả 200", home.status(), 200);
-  assertTrue("trang chủ hiện lời mời kết nối ví", await page.getByText("Nhận thanh toán Cardano cho Kolo").isVisible());
+
+  // Nội dung trang chủ nằm trong client component nạp với `ssr: false` và kéo theo
+  // WASM của Mesh, nên `networkidle` chưa đủ — hỏi ngay thì thỉnh thoảng trượt.
+  // Chờ tường minh, giống cách trang thanh toán bên dưới vẫn làm.
+  const welcome = page.getByText("Nhận thanh toán Cardano cho Kolo");
+  await welcome.waitFor({ timeout: 30_000 }).catch(() => {});
+  assertTrue("trang chủ hiện lời mời kết nối ví", await welcome.isVisible());
 
   /* --- Trang thanh toán --- */
   const pay = await page.goto(payUrl, { waitUntil: "networkidle" });
@@ -123,7 +140,7 @@ try {
   );
 
   /* --- Chọn token --- */
-  const tokenButtons = page.locator("button", { hasText: /^(ADA|tUSDM|tiUSD|tDJED|tUSDA|USDM)/ });
+  const tokenButtons = page.locator("button", { hasText: /^(ADA|tUSDM|tiUSD|tDJED|tUSDA|tUSDC|USDM)/ });
   const tokenCount = await tokenButtons.count();
   assertTrue(`có nút chọn token (${tokenCount} nút)`, tokenCount >= 1);
 

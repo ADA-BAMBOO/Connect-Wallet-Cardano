@@ -16,11 +16,16 @@ export const LOCALES = ["vi", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 
 /**
- * Tiếng Việt là mặc định khi chưa có cookie.
+ * Tiếng Việt là mặc định khi chưa có cookie và chưa khai `DEFAULT_LOCALE`.
  *
  * KHÔNG tự đoán theo `Accept-Language`. Ngôn ngữ hiện ra phải phụ thuộc đúng một
  * thứ người dùng bấm được, thay vì đổi theo cấu hình trình duyệt của từng máy —
  * và các bài kiểm thử giao diện cũng cần một mặc định tiền đoán được.
+ *
+ * Muốn dựng một phiên bản mặc định tiếng Anh (buổi demo cho người nước ngoài, hay
+ * một lần deploy riêng cho thị trường khác) thì đặt biến môi trường `DEFAULT_LOCALE`
+ * — xem `resolveDefaultLocale` ở lib/i18n/server.ts. Hằng số ở đây vẫn là chốt chặn
+ * cuối cùng khi biến đó vắng mặt hoặc sai giá trị.
  */
 export const DEFAULT_LOCALE: Locale = "vi";
 
@@ -33,8 +38,8 @@ export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
 }
 
-export function resolveLocale(value: unknown): Locale {
-  return isLocale(value) ? value : DEFAULT_LOCALE;
+export function resolveLocale(value: unknown, fallback: Locale = DEFAULT_LOCALE): Locale {
+  return isLocale(value) ? value : fallback;
 }
 
 /** Tên ngôn ngữ hiển thị trên nút đổi — luôn viết bằng chính ngôn ngữ đó. */

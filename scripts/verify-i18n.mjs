@@ -27,6 +27,34 @@ nextEnv.loadEnvConfig(projectDir, false, { info: () => {}, error: console.error 
 const BASE = process.argv.find((a) => a.startsWith("http")) ?? "http://localhost:3000";
 const LOCALE_COOKIE = "cardano_locale";
 
+/*
+ * Ngôn ngữ khởi điểm đọc từ chính biến mà app đọc, thay vì đóng đinh "vi".
+ * Đặt DEFAULT_LOCALE=en (ví dụ khi dựng bản demo tiếng Anh) thì bộ kiểm thử này
+ * đi theo — nếu không, cấu hình hợp lệ lại làm cả bộ kiểm thử đỏ.
+ */
+const LOCALES = {
+  vi: {
+    label: "Tiếng Việt",
+    headline: "Nhận thanh toán Cardano cho Kolo",
+    title: "Cổng thanh toán Cardano cho Kolo",
+    orders: /Sổ đơn hàng/,
+  },
+  en: {
+    label: "English",
+    headline: "Take Cardano payments for Kolo",
+    title: "the Cardano payment gateway for Kolo",
+    orders: /Order book|order book|locked/,
+  },
+};
+
+const START = LOCALES[process.env.DEFAULT_LOCALE?.trim()] ? process.env.DEFAULT_LOCALE.trim() : "vi";
+const OTHER = START === "vi" ? "en" : "vi";
+const from = LOCALES[START];
+const to = LOCALES[OTHER];
+
+console.log(`Ngôn ngữ mặc định đang cấu hình: ${START} -> đổi sang ${OTHER}
+`);
+
 let failures = 0;
 let passes = 0;
 
@@ -48,28 +76,28 @@ const page = await context.newPage();
 const pageErrors = [];
 page.on("pageerror", (err) => pageErrors.push(err.message));
 
-/* 1. Mặc định: chưa có cookie -> tiếng Việt ------------------------- */
+/* 1. Chưa có cookie -> ngôn ngữ mặc định đang cấu hình -------------- */
 
 await page.goto(BASE, { waitUntil: "domcontentloaded" });
-await page.getByText("Nhận thanh toán Cardano cho Kolo").waitFor({ timeout: 30_000 });
+await page.getByText(from.headline).waitFor({ timeout: 30_000 });
 
-assert("mặc định là tiếng Việt", await page.getByText("Nhận thanh toán Cardano cho Kolo").isVisible(), "true");
-assert('<html lang> mặc định là "vi"', await page.locator("html").getAttribute("lang"), "vi");
+assert(`mặc định là "${START}"`, await page.getByText(from.headline).isVisible(), "true");
+assert(`<html lang> mặc định là "${START}"`, await page.locator("html").getAttribute("lang"), START);
 
-/* 2. Bấm EN -> client và server cùng đổi ---------------------------- */
+/* 2. Bấm ngôn ngữ kia -> client và server cùng đổi ------------------ */
 
-await page.getByRole("button", { name: /English/ }).click();
-await page.getByText("Take Cardano payments for Kolo").waitFor({ timeout: 30_000 });
+await page.getByRole("button", { name: new RegExp(to.label) }).click();
+await page.getByText(to.headline).waitFor({ timeout: 30_000 });
 
 assert(
-  "bấm EN thì component client đổi sang tiếng Anh",
-  await page.getByText("Take Cardano payments for Kolo").isVisible(),
+  `bấm ${to.label} thì component client đổi theo`,
+  await page.getByText(to.headline).isVisible(),
   "true",
 );
-assert('<html lang> đổi thành "en"', await page.locator("html").getAttribute("lang"), "en");
+assert(`<html lang> đổi thành "${OTHER}"`, await page.locator("html").getAttribute("lang"), OTHER);
 assert(
-  "không còn chuỗi tiếng Việt nào của màn hình chào",
-  await page.getByText("Nhận thanh toán Cardano cho Kolo").isVisible().catch(() => false),
+  `không còn chuỗi "${START}" nào của màn hình chào`,
+  await page.getByText(from.headline).isVisible().catch(() => false),
   "false",
 );
 
@@ -77,31 +105,27 @@ const cookies = await context.cookies();
 assert(
   "lựa chọn được ghi vào cookie",
   cookies.find((c) => c.name === LOCALE_COOKIE)?.value,
-  "en",
+  OTHER,
 );
 
 /* 3. Sống qua reload ------------------------------------------------ */
 
 await page.reload({ waitUntil: "domcontentloaded" });
-await page.getByText("Take Cardano payments for Kolo").waitFor({ timeout: 30_000 });
+await page.getByText(to.headline).waitFor({ timeout: 30_000 });
 assert(
-  "vẫn là tiếng Anh sau khi tải lại trang",
-  await page.getByText("Take Cardano payments for Kolo").isVisible(),
+  `vẫn là "${OTHER}" sau khi tải lại trang`,
+  await page.getByText(to.headline).isVisible(),
   "true",
 );
 
 /* 4. Component server: tiêu đề trang + sổ đơn hàng ------------------ */
 
-assert("thẻ <title> cũng đổi theo", (await page.title()).includes("the Cardano payment gateway for Kolo"), "true");
+assert("thẻ <title> cũng đổi theo", (await page.title()).includes(to.title), "true");
 
 await page.goto(`${BASE}/orders`, { waitUntil: "domcontentloaded" });
 const ordersHtml = await page.content();
-assert(
-  "sổ đơn hàng (server component) hiện tiếng Anh",
-  /Order book|order book|locked/.test(ordersHtml),
-  "true",
-);
-assert("sổ đơn hàng không còn tiêu đề tiếng Việt", /Sổ đơn hàng/.test(ordersHtml), "false");
+assert(`sổ đơn hàng (server component) hiện "${OTHER}"`, to.orders.test(ordersHtml), "true");
+assert(`sổ đơn hàng không còn tiêu đề "${START}"`, from.orders.test(ordersHtml), "false");
 
 /* 5. Thông báo lỗi của API đi theo cookie --------------------------- */
 
