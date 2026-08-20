@@ -57,6 +57,26 @@ npm run demo:shop    # Kolo giả lập     → localhost:3100
 
 Cửa sổ thứ ba để xem nhật ký — `npm run demo:shop` in ra từng bước ①③✓ khi chúng xảy ra.
 
+### Demo bằng tiếng Anh
+
+Đặt một dòng trong `.env.local` là cả hai bên cùng mở ra tiếng Anh:
+
+```bash
+DEFAULT_LOCALE=en
+```
+
+Nó đổi ngôn ngữ **mặc định** của cổng thanh toán, của trang Kolo giả lập, và của cả
+nhật ký terminal — thứ bạn sẽ chỉ vào ở bước 6. Nút VI/EN ở cả hai bên vẫn dùng được,
+và lựa chọn của người xem vẫn được nhớ trong cookie.
+
+Bỏ dòng đó đi thì mọi thứ quay về tiếng Việt. Điền sai tên ngôn ngữ thì app cảnh báo
+trong log rồi dùng tiếng Việt, không sập.
+
+> Hai bên đồng bộ ngôn ngữ được là nhờ dùng chung cookie `cardano_locale` — cookie phân
+> định theo host, mà cả hai cùng chạy trên `localhost`. Kolo thật nằm ở domain khác nên
+> **không** thừa hưởng điều này; lúc ghép thật, shop phải truyền ngôn ngữ sang cổng một
+> cách tường minh.
+
 ### Kịch bản trình diễn
 
 | | Làm gì | Người xem thấy gì |
@@ -119,6 +139,7 @@ Nằm trong `.env.local` của cổng thanh toán:
 | `MERCHANT_WEBHOOK_URL` | `http://localhost:3100/api/webhooks/kolo-pay` |
 | `MERCHANT_WEBHOOK_SECRET` | Khoá ký webhook, hai bên phải giống nhau. |
 | `MERCHANT_RETURN_URL_ORIGINS` | Phải chứa `http://localhost:3100`. |
+| `DEFAULT_LOCALE` | `en` để demo bằng tiếng Anh, bỏ trống để dùng tiếng Việt. |
 
 Đổi cổng của shop giả lập: `KOLO_SHOP_PORT=3200 npm run demo:shop` — nhớ sửa hai biến
 `MERCHANT_WEBHOOK_URL` và `MERCHANT_RETURN_URL_ORIGINS` cho khớp.

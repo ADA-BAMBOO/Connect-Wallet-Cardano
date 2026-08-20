@@ -37,6 +37,14 @@ import {
   CardanoPayError,
   type OrderStatus,
 } from "../../integration/cardano-pay-client.ts";
+import {
+  isLocale,
+  LOCALES,
+  LOCALE_SHORT,
+  STRINGS,
+  type Locale,
+  type ShopDict,
+} from "./strings.ts";
 
 /* ------------------------------------------------------------------ */
 /* Cấu hình                                                            */
@@ -56,8 +64,31 @@ const API_KEY = (process.env.MERCHANT_API_KEYS ?? "").split(",")[0]?.trim() ?? "
 const WEBHOOK_SECRET = process.env.MERCHANT_WEBHOOK_SECRET ?? "";
 const NETWORK = (process.env.KOLO_SHOP_NETWORK ?? "preprod") as "mainnet" | "preprod" | "preview";
 
+/*
+ * Ngôn ngữ mặc định lấy từ CÙNG biến mà cổng thanh toán đọc, nên đặt DEFAULT_LOCALE=en
+ * một lần là cả hai bên cùng mở ra tiếng Anh — không có màn shop tiếng Việt bàn giao
+ * sang trang thanh toán tiếng Anh giữa buổi demo.
+ */
+const DEFAULT_LOCALE: Locale = isLocale(process.env.DEFAULT_LOCALE?.trim())
+  ? (process.env.DEFAULT_LOCALE!.trim() as Locale)
+  : "vi";
+
+/*
+ * Cookie trùng tên với cookie của cổng thanh toán. Cookie phân định theo HOST chứ
+ * không theo cổng, nên khi cả hai cùng chạy trên localhost, bấm đổi ngôn ngữ ở bên
+ * nào thì bên kia cũng đi theo — tiện đúng cho demo.
+ *
+ * ĐỪNG dựa vào chuyện này khi ghép Kolo thật: hai domain khác nhau thì không dùng
+ * chung cookie, lúc đó shop phải truyền ngôn ngữ sang cổng một cách tường minh.
+ */
+const LOCALE_COOKIE = "cardano_locale";
+
+/** Nhật ký terminal đi theo ngôn ngữ mặc định — nó là một dòng chảy, không theo request. */
+const logDict = STRINGS[DEFAULT_LOCALE];
+const L = logDict.log;
+
 if (!API_KEY) {
-  console.error("Thiếu MERCHANT_API_KEYS trong .env.local của cổng thanh toán.");
+  console.error(L.noApiKey);
   process.exit(1);
 }
 
@@ -67,7 +98,12 @@ const koloPay = createCardanoPayClient({ baseUrl: PAY_URL, apiKey: API_KEY, netw
 /* "Kho hàng" và "database" của shop                                   */
 /* ------------------------------------------------------------------ */
 
-type Sku = { id: string; name: string; blurb: string; amountUsd: string };
+type Sku = {
+  id: string;
+  amountUsd: string;
+  name: Record<Locale, string>;
+  blurb: Record<Locale, string>;
+};
 
 /**
  * Giá LUÔN đến từ đây, không bao giờ từ request. Nhận giá do trình duyệt gửi lên là
@@ -76,21 +112,30 @@ type Sku = { id: string; name: string; blurb: string; amountUsd: string };
 const CATALOG: Sku[] = [
   {
     id: "pro-thang",
-    name: "Kolo Pro — 1 tháng",
-    blurb: "Lưu bộ sưu tập công cụ, bỏ giới hạn lượt tính, xuất kết quả ra Excel.",
     amountUsd: "4.90",
+    name: { vi: "Kolo Pro — 1 tháng", en: "Kolo Pro — 1 month" },
+    blurb: {
+      vi: "Lưu bộ sưu tập công cụ, bỏ giới hạn lượt tính, xuất kết quả ra Excel.",
+      en: "Save tool collections, drop the usage cap, export results to Excel.",
+    },
   },
   {
     id: "pro-nam",
-    name: "Kolo Pro — 1 năm",
-    blurb: "Như gói tháng, trả trước 12 tháng và tiết kiệm hai tháng.",
     amountUsd: "49.00",
+    name: { vi: "Kolo Pro — 1 năm", en: "Kolo Pro — 1 year" },
+    blurb: {
+      vi: "Như gói tháng, trả trước 12 tháng và tiết kiệm hai tháng.",
+      en: "The monthly plan paid twelve months up front — two months free.",
+    },
   },
   {
     id: "bo-ban-hang",
-    name: "Bộ công cụ Bán hàng",
-    blurb: "15 công cụ tính giá vốn, chiết khấu, hoa hồng và điểm hoà vốn. Mua một lần.",
     amountUsd: "9.90",
+    name: { vi: "Bộ công cụ Bán hàng", en: "Sales toolkit" },
+    blurb: {
+      vi: "15 công cụ tính giá vốn, chiết khấu, hoa hồng và điểm hoà vốn. Mua một lần.",
+      en: "15 calculators for cost, discount, commission and breakeven. One-off purchase.",
+    },
   },
 ];
 
@@ -107,6 +152,25 @@ type ShopOrder = {
 
 const orders = new Map<string, ShopOrder>();
 let counter = 0;
+
+/* ------------------------------------------------------------------ */
+/* Ngôn ngữ của một request                                            */
+/* ------------------------------------------------------------------ */
+
+function readLocale(req: IncomingMessage): Locale {
+  const raw = req.headers.cookie ?? "";
+
+  for (const part of raw.split(";")) {
+    const index = part.indexOf("=");
+    if (index === -1) continue;
+    if (part.slice(0, index).trim() !== LOCALE_COOKIE) continue;
+
+    const value = decodeURIComponent(part.slice(index + 1).trim());
+    if (isLocale(value)) return value;
+  }
+
+  return DEFAULT_LOCALE;
+}
 
 /* ------------------------------------------------------------------ */
 /* Giao diện — dùng đúng design token đọc từ bboapp.xyz                */
@@ -127,10 +191,16 @@ body{margin:0;background:var(--bg);color:var(--text);
 a{color:var(--green);text-underline-offset:3px}
 header{border-bottom:1px solid var(--border-soft);background:var(--bg)}
 .bar,.wrap{max-width:960px;margin:0 auto;padding:0 24px}
-.bar{display:flex;align-items:center;justify-content:space-between;height:64px}
+.bar{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
 .brand{font-size:22px;font-weight:700;color:var(--text);text-decoration:none;letter-spacing:-.01em}
+.bar-right{display:flex;align-items:center;gap:12px}
 .chip{display:inline-block;background:var(--bg-green-soft);color:var(--green);
   border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600}
+.lang{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-btn);overflow:hidden}
+.lang a{display:block;padding:5px 11px;font-size:13px;font-weight:600;text-decoration:none;
+  color:var(--text-2);background:var(--bg)}
+.lang a:hover{background:var(--bg-2)}
+.lang a[aria-current="true"]{background:var(--bg-green-soft);color:var(--green)}
 h1{font-size:38px;line-height:1.2;letter-spacing:-.02em;margin:24px 0 8px}
 h2{font-size:20px;margin:0 0 4px}
 .lead{color:var(--text-2);margin:0 0 8px;max-width:62ch}
@@ -169,42 +239,62 @@ const ENTITIES: Record<string, string> = {
 
 const escape = (value: string) => value.replace(/[&<>"']/g, (c) => ENTITIES[c] as string);
 
-function page(title: string, body: string, refreshSeconds?: number) {
+/** Nút đổi ngôn ngữ giữ nguyên đường dẫn hiện tại, chỉ thêm `?lang=`. */
+function languageSwitch(t: ShopDict, locale: Locale, route: string) {
+  const buttons = LOCALES.map((candidate) => {
+    const href = `${route}?lang=${candidate}`;
+    const current = candidate === locale ? ' aria-current="true"' : "";
+    return `<a href="${escape(href)}"${current}>${LOCALE_SHORT[candidate]}</a>`;
+  }).join("");
+
+  return `<nav class="lang" aria-label="${escape(t.switchLanguage)}">${buttons}</nav>`;
+}
+
+function page(
+  t: ShopDict,
+  locale: Locale,
+  route: string,
+  title: string,
+  body: string,
+  refreshSeconds?: number,
+) {
   const refresh = refreshSeconds
     ? `<meta http-equiv="refresh" content="${refreshSeconds}">`
     : "";
 
-  return `<!doctype html><html lang="vi"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="${t.htmlLang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escape(title)}</title>${refresh}
 <style>${CSS}</style></head><body>
 <header><div class="bar"><a class="brand" href="/">Kolo</a>
-<span class="chip">Bản demo · ${escape(NETWORK)}</span></div></header>
+<div class="bar-right"><span class="chip">${escape(t.demoBadge(NETWORK))}</span>
+${languageSwitch(t, locale, route)}</div></div></header>
 <main class="wrap">${body}</main>
-<footer class="wrap">Kolo giả lập — dựng để demo cổng thanh toán Kolo Pay đang chạy ở
-<span class="mono">${escape(PAY_URL)}</span>.</footer></body></html>`;
+<footer class="wrap">${escape(t.footer(PAY_URL))}</footer></body></html>`;
 }
 
 /* ------------------------------------------------------------------ */
 /* Trang chủ shop                                                      */
 /* ------------------------------------------------------------------ */
 
-function shopPage() {
+function shopPage(t: ShopDict, locale: Locale) {
   const cards = CATALOG.map(
     (sku) => `<div class="card">
-      <h2>${escape(sku.name)}</h2>
-      <p>${escape(sku.blurb)}</p>
+      <h2>${escape(sku.name[locale])}</h2>
+      <p>${escape(sku.blurb[locale])}</p>
       <div class="price">$${escape(sku.amountUsd)} <span>USD</span></div>
       <form method="post" action="/mua"><input type="hidden" name="sku" value="${escape(sku.id)}">
-      <button type="submit">Thanh toán bằng Cardano</button></form>
+      <button type="submit">${escape(t.buy)}</button></form>
     </div>`,
   ).join("");
 
   return page(
-    "Kolo — nâng cấp tài khoản",
-    `<h1>Nâng cấp tài khoản Kolo</h1>
-     <p class="lead">Trả bằng ADA hoặc stablecoin trên Cardano. Không cần thẻ, không qua
-     trung gian — bấm nút là chuyển sang cổng thanh toán của Kolo.</p>
+    t,
+    locale,
+    "/",
+    t.shopTitle,
+    `<h1>${escape(t.shopHeading)}</h1>
+     <p class="lead">${escape(t.shopLead)}</p>
      <div class="grid">${cards}</div>`,
   );
 }
@@ -213,9 +303,11 @@ function shopPage() {
 /* ① Khách bấm mua → tạo đơn ở cổng thanh toán → redirect              */
 /* ------------------------------------------------------------------ */
 
-async function handleBuy(res: ServerResponse, form: URLSearchParams) {
+async function handleBuy(res: ServerResponse, form: URLSearchParams, t: ShopDict, locale: Locale) {
   const sku = CATALOG.find((item) => item.id === form.get("sku"));
-  if (!sku) return send(res, 400, page("Lỗi", "<h1>Không có sản phẩm này</h1>"));
+  if (!sku) {
+    return send(res, 400, page(t, locale, "/", t.errorTitle, `<h1>${escape(t.noSuchProduct)}</h1>`));
+  }
 
   // Hậu tố ngẫu nhiên chứ không phải số đếm thuần: "database" nằm trong RAM nên số đếm
   // quay về 0 sau mỗi lần khởi động lại, và mã đơn trùng với lần chạy trước sẽ bị cổng
@@ -241,7 +333,9 @@ async function handleBuy(res: ServerResponse, form: URLSearchParams) {
     const { payUrl, order, reused } = await koloPay.createPayment({
       externalOrderId: shopOrderId,
       amountUsd: sku.amountUsd,
-      description: sku.name,
+      // Mô tả gửi sang cổng theo ngôn ngữ khách đang xem: nó hiện lại trên trang
+      // thanh toán, và đổi ngôn ngữ giữa hai trang là điều khách sẽ để ý ngay.
+      description: sku.name[locale],
       returnUrl: `${SHOP_URL}/don-hang/${shopOrderId}`,
     });
 
@@ -249,23 +343,25 @@ async function handleBuy(res: ServerResponse, form: URLSearchParams) {
     record.status = order.status;
     record.updatedAt = new Date().toISOString();
 
-    log("①", `tạo đơn ${shopOrderId} → ref ${order.ref}${reused ? " (dùng lại)" : ""}`);
+    log("①", L.orderCreated(shopOrderId, order.ref, reused));
     res.writeHead(302, { location: payUrl }).end();
   } catch (error) {
     const detail =
       error instanceof CardanoPayError ? `${error.message} (HTTP ${error.status})` : String(error);
-    log("✗", `tạo đơn hỏng: ${detail}`);
+    log("✗", L.createFailed(detail));
 
     send(
       res,
       502,
       page(
-        "Không tạo được đơn",
-        `<h1>Không tạo được đơn thanh toán</h1>
-         <p class="lead">Cổng thanh toán trả về: <span class="mono">${escape(detail)}</span></p>
-         <div class="panel note">Kiểm tra <span class="mono">${escape(PAY_URL)}</span> đang chạy,
-         và <span class="mono">MERCHANT_API_KEYS</span> khớp với khoá shop đang dùng.</div>
-         <p><a href="/">← Quay lại</a></p>`,
+        t,
+        locale,
+        "/",
+        t.createFailedTitle,
+        `<h1>${escape(t.createFailedHeading)}</h1>
+         <p class="lead">${escape(t.createFailedLead(detail))}</p>
+         <div class="panel note">${escape(t.createFailedHint(PAY_URL))}</div>
+         <p><a href="/">${escape(t.back)}</a></p>`,
       ),
     );
   }
@@ -282,7 +378,7 @@ async function handleWebhook(req: IncomingMessage, res: ServerResponse) {
   const result = verifyWebhook(raw, typeof header === "string" ? header : null, WEBHOOK_SECRET);
 
   if (!result.ok) {
-    log("✗", `webhook bị từ chối: ${result.error}`);
+    log("✗", L.webhookRejected(result.error));
     return send(res, 401, JSON.stringify({ error: result.error }), "application/json");
   }
 
@@ -296,10 +392,7 @@ async function handleWebhook(req: IncomingMessage, res: ServerResponse) {
   // `ref` rỗng cũng bị chặn: shop chưa tạo được đơn nào ở cổng thanh toán cho mã này,
   // nên không có gì để đối chiếu, và giao hàng lúc này là giao mù.
   if (record && data.ref !== record.ref) {
-    log(
-      "✗",
-      `webhook nói về ref ${data.ref}, đơn ${record.id} đang giữ ref ${record.ref ?? "(chưa có)"} — bỏ qua`,
-    );
+    log("✗", L.refMismatch(data.ref, record.id, record.ref ?? L.noRefYet));
     return send(res, 200, JSON.stringify({ ok: true, ignored: "ref mismatch" }), "application/json");
   }
 
@@ -312,11 +405,11 @@ async function handleWebhook(req: IncomingMessage, res: ServerResponse) {
     // CHỈ `confirmed` mới được giao hàng. `seen` là đã lên chain nhưng chưa đủ xác nhận.
     if (data.status === "confirmed" && !record.delivered) {
       record.delivered = true;
-      log("✓", `GIAO HÀNG: ${record.id} — ${record.sku.name} (${record.paidWith ?? "?"})`);
+      log("✓", L.delivered(record.id, record.sku.name[DEFAULT_LOCALE], record.paidWith ?? "?"));
     }
   }
 
-  log("③", `webhook ${event} → ${data.externalOrderId ?? data.ref} = ${data.status}`);
+  log("③", L.webhookReceived(event, data.externalOrderId ?? data.ref, data.status));
 
   // Trả 2xx nhanh; cổng thanh toán thử lại nếu không nhận được.
   send(res, 200, JSON.stringify({ ok: true }), "application/json");
@@ -326,23 +419,26 @@ async function handleWebhook(req: IncomingMessage, res: ServerResponse) {
 /* ④ Trang cảm ơn — KHÔNG tin tham số trên URL                         */
 /* ------------------------------------------------------------------ */
 
-const STATUS_LABEL: Record<string, string> = {
-  created: "Chưa thanh toán",
-  pending: "Đang chờ thanh toán",
-  seen: "Đã thấy giao dịch, đang chờ đủ xác nhận",
-  confirmed: "Đã thanh toán",
-  underpaid: "Trả thiếu — cần xử lý tay",
-  expired: "Đơn đã hết hạn",
-  failed: "Thất bại",
-};
-
-async function handleOrderPage(res: ServerResponse, shopOrderId: string) {
+async function handleOrderPage(
+  res: ServerResponse,
+  shopOrderId: string,
+  t: ShopDict,
+  locale: Locale,
+) {
+  const route = `/don-hang/${encodeURIComponent(shopOrderId)}`;
   const record = orders.get(shopOrderId);
+
   if (!record) {
     return send(
       res,
       404,
-      page("Không thấy đơn", '<h1>Không thấy đơn này</h1><p><a href="/">← Trang chủ</a></p>'),
+      page(
+        t,
+        locale,
+        route,
+        t.notFoundTitle,
+        `<h1>${escape(t.notFoundHeading)}</h1><p><a href="/">${escape(t.backToHome)}</a></p>`,
+      ),
     );
   }
 
@@ -357,13 +453,13 @@ async function handleOrderPage(res: ServerResponse, shopOrderId: string) {
 
       if (order.status === "confirmed" && !record.delivered) {
         record.delivered = true;
-        log("✓", `GIAO HÀNG (qua poll): ${record.id} — ${record.sku.name}`);
+        log("✓", L.deliveredByPoll(record.id, record.sku.name[DEFAULT_LOCALE]));
       }
 
       // Chỉ xảy ra khi diễn tập bằng `npm run demo:webhook` trên một đơn chưa trả:
       // shop đã giao vì tin webhook, còn cổng thanh toán thì nói đơn vẫn đang chờ.
       if (order.status !== "confirmed" && record.delivered) {
-        log("⚠", `${record.id} đã giao nhưng cổng thanh toán báo "${order.status}" — webhook diễn tập?`);
+        log("⚠", L.deliveredButUnpaid(record.id, order.status));
       }
     } catch {
       /* Không hỏi được thì hiện trạng thái cuối cùng biết được, đừng vỡ trang. */
@@ -374,47 +470,54 @@ async function handleOrderPage(res: ServerResponse, shopOrderId: string) {
   const dead =
     record.status === "expired" || record.status === "failed" || record.status === "underpaid";
   const tone = done ? "ok" : dead ? "bad" : "wait";
+  const product = record.sku.name[locale];
 
   const body = `
-    <h1>${done ? "Cảm ơn bạn!" : "Đơn hàng của bạn"}</h1>
+    <h1>${escape(done ? t.thanksHeading : t.orderHeading)}</h1>
     <p class="lead">${
       done
-        ? `Đã kích hoạt <strong>${escape(record.sku.name)}</strong> cho tài khoản Kolo của bạn.`
-        : "Trang này tự làm mới. Trạng thái được hỏi thẳng từ cổng thanh toán, không lấy từ tham số trên URL."
+        ? `${escape(t.thanksLead1)} <strong>${escape(product)}</strong> ${escape(t.thanksLead2)}`
+        : escape(t.orderLead)
     }</p>
     <div class="panel">
       <dl style="margin:0">
-        <div class="row"><dt>Trạng thái</dt><dd><span class="state ${tone}"><span class="dot"></span>${escape(
-          STATUS_LABEL[record.status] ?? record.status,
+        <div class="row"><dt>${escape(t.rowStatus)}</dt><dd><span class="state ${tone}"><span class="dot"></span>${escape(
+          t.status[record.status] ?? record.status,
         )}</span></dd></div>
-        <div class="row"><dt>Mã đơn Kolo</dt><dd class="mono">${escape(record.id)}</dd></div>
-        <div class="row"><dt>Sản phẩm</dt><dd>${escape(record.sku.name)}</dd></div>
-        <div class="row"><dt>Số tiền</dt><dd>$${escape(record.sku.amountUsd)} USD</dd></div>
-        <div class="row"><dt>Mã ở cổng thanh toán</dt><dd class="mono">${escape(
+        <div class="row"><dt>${escape(t.rowOrderId)}</dt><dd class="mono">${escape(record.id)}</dd></div>
+        <div class="row"><dt>${escape(t.rowProduct)}</dt><dd>${escape(product)}</dd></div>
+        <div class="row"><dt>${escape(t.rowAmount)}</dt><dd>$${escape(record.sku.amountUsd)} USD</dd></div>
+        <div class="row"><dt>${escape(t.rowRef)}</dt><dd class="mono">${escape(
           record.ref ?? "—",
         )}</dd></div>
         ${
           record.paidWith
-            ? `<div class="row"><dt>Trả bằng</dt><dd>${escape(record.paidWith)}</dd></div>`
+            ? `<div class="row"><dt>${escape(t.rowPaidWith)}</dt><dd>${escape(record.paidWith)}</dd></div>`
             : ""
         }
         ${
           record.txHash
-            ? `<div class="row"><dt>Giao dịch</dt><dd class="mono">${escape(record.txHash)}</dd></div>`
+            ? `<div class="row"><dt>${escape(t.rowTx)}</dt><dd class="mono">${escape(record.txHash)}</dd></div>`
             : ""
         }
-        <div class="row"><dt>Đã giao hàng</dt><dd>${record.delivered ? "rồi" : "chưa"}</dd></div>
+        <div class="row"><dt>${escape(t.rowDelivered)}</dt><dd>${escape(
+          record.delivered ? t.yes : t.no,
+        )}</dd></div>
       </dl>
     </div>
     ${
       done
-        ? '<p><a href="/">← Về trang chủ Kolo</a></p>'
-        : `<p class="note">Chưa trả xong? <a href="${escape(PAY_URL)}/pay/${escape(
+        ? `<p><a href="/">${escape(t.backHome)}</a></p>`
+        : `<p class="note">${escape(t.notFinished)} <a href="${escape(PAY_URL)}/pay/${escape(
             record.ref ?? "",
-          )}">Mở lại trang thanh toán</a></p>`
+          )}">${escape(t.reopenPayPage)}</a></p>`
     }`;
 
-  send(res, 200, page(done ? "Cảm ơn bạn — Kolo" : "Đơn hàng — Kolo", body, done ? undefined : 4));
+  send(
+    res,
+    200,
+    page(t, locale, route, done ? t.thanksTitle : t.orderTitle, body, done ? undefined : 4),
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -438,50 +541,88 @@ function readBody(req: IncomingMessage) {
 }
 
 function log(mark: string, message: string) {
-  console.log(`  ${mark}  ${new Date().toLocaleTimeString("vi-VN")}  ${message}`);
+  console.log(`  ${mark}  ${new Date().toLocaleTimeString(logDict.dateLocale)}  ${message}`);
 }
 
 const server = createServer((req, res) => {
-  const route = new URL(req.url ?? "/", SHOP_URL).pathname;
+  const url = new URL(req.url ?? "/", SHOP_URL);
+  const route = url.pathname;
 
   void (async () => {
     try {
-      if (req.method === "GET" && route === "/") return send(res, 200, shopPage());
-
-      if (req.method === "POST" && route === "/mua") {
-        return handleBuy(res, new URLSearchParams(await readBody(req)));
+      /*
+       * `?lang=` ghi cookie rồi chuyển hướng về chính đường dẫn đó, sạch tham số.
+       * Làm ở server thay vì bằng JS để trang vẫn đổi được ngôn ngữ khi tắt script,
+       * và để URL sau khi bấm không dính tham số đem đi chia sẻ nhầm.
+       */
+      const requested = url.searchParams.get("lang");
+      if (req.method === "GET" && isLocale(requested)) {
+        return res
+          .writeHead(302, {
+            location: route,
+            "set-cookie": `${LOCALE_COOKIE}=${requested}; Path=/; Max-Age=31536000; SameSite=Lax`,
+          })
+          .end();
       }
 
+      const locale = readLocale(req);
+      const t = STRINGS[locale];
+
+      if (req.method === "GET" && route === "/") return send(res, 200, shopPage(t, locale));
+
+      if (req.method === "POST" && route === "/mua") {
+        return handleBuy(res, new URLSearchParams(await readBody(req)), t, locale);
+      }
+
+      // Webhook đến từ máy chủ, không từ trình duyệt — không có ngôn ngữ nào ở đây.
       if (req.method === "POST" && route === "/api/webhooks/kolo-pay") {
         return handleWebhook(req, res);
       }
 
       if (req.method === "GET" && route.startsWith("/don-hang/")) {
-        return handleOrderPage(res, decodeURIComponent(route.slice("/don-hang/".length)));
+        return handleOrderPage(
+          res,
+          decodeURIComponent(route.slice("/don-hang/".length)),
+          t,
+          locale,
+        );
       }
 
       if (req.method === "GET" && route === "/health") {
         return send(res, 200, JSON.stringify({ ok: true, orders: orders.size }), "application/json");
       }
 
-      send(res, 404, page("Không có trang này", '<h1>404</h1><p><a href="/">← Trang chủ</a></p>'));
+      send(
+        res,
+        404,
+        page(
+          t,
+          locale,
+          "/",
+          t.noPageTitle,
+          `<h1>404</h1><p><a href="/">${escape(t.backToHome)}</a></p>`,
+        ),
+      );
     } catch (error) {
       console.error(error);
-      send(res, 500, page("Lỗi", "<h1>500</h1>"));
+      send(res, 500, "<h1>500</h1>");
     }
   })();
 });
 
 server.listen(PORT, () => {
-  const warning = WEBHOOK_SECRET
-    ? ""
-    : "\n  ⚠ Chưa có MERCHANT_WEBHOOK_SECRET — mọi webhook sẽ bị từ chối.\n";
+  // Nhãn dài ngắn khác nhau giữa hai thứ tiếng, nên căn cột theo nhãn dài nhất thay
+  // vì đếm dấu cách bằng tay trong từng bản dịch.
+  const rows: [string, string][] = [
+    [L.labelShop, SHOP_URL],
+    [L.labelGateway, `${PAY_URL}   (${NETWORK})`],
+    [L.labelWebhook, `${SHOP_URL}/api/webhooks/kolo-pay`],
+    [L.labelLanguage, `${DEFAULT_LOCALE}   (${L.languageHint})`],
+  ];
 
-  console.log(`
-  Kolo giả lập     →  ${SHOP_URL}
-  Cổng thanh toán  →  ${PAY_URL}   (mạng ${NETWORK})
-  Webhook nhận ở   →  ${SHOP_URL}/api/webhooks/kolo-pay
-${warning}
-  Nhật ký luồng thanh toán hiện bên dưới.
-`);
+  const width = Math.max(...rows.map(([label]) => label.length));
+  const banner = rows.map(([label, value]) => `  ${label.padEnd(width)} →  ${value}`).join("\n");
+  const warning = WEBHOOK_SECRET ? "" : `\n  ${L.noWebhookSecret}\n`;
+
+  console.log(`\n${banner}\n${warning}\n  ${L.watching}\n`);
 });
