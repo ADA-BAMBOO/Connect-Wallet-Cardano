@@ -118,10 +118,10 @@ Bốn giá trị phải **trỏ đúng vào nhau**, lệch một ký tự là h�
 `MERCHANT_API_KEYS` và `MERCHANT_WEBHOOK_SECRET` chỉ khai một lần — trang demo đọc đúng
 file này, nên không còn cửa để hai bên lệch nhau.
 
-**`TRUSTED_PROXY_HOPS`** — số proxy tin cậy đứng trước app. Chỉ nginx của máy aaPanel thì
-`1`; nếu bboapp.xyz còn đi qua Cloudflare bật proxy thì `2`. Đặt sai thì hạn mức theo IP
-hoặc mất tác dụng hoàn toàn (mỗi request rơi vào một bucket riêng), hoặc gom cả thiên hạ
-vào một bucket. `/api/payments/health` báo rõ khi biến này vắng mặt.
+**`TRUSTED_PROXY_HOPS=1`** — đúng một proxy đứng trước app: nginx của máy aaPanel.
+bboapp.xyz không qua Cloudflare. Bật Cloudflare sau này thì đổi thành `2`; quên đổi là
+hạn mức theo IP đọc nhầm địa chỉ của Cloudflare và gom mọi khách vào chung một bucket.
+`/api/payments/health` báo rõ khi biến này vắng mặt.
 
 Để `PAYMENT_ENABLED_MAINNET=false` lúc này. Bật ở mục 8, sau khi mọi thứ đã xanh.
 
@@ -235,7 +235,12 @@ ports:
 chính máy này.
 
 **b. Chỉ cho máy aaPanel gọi vào 4000/4100.** iptables đang trống (policy ACCEPT), nghĩa
-là mọi máy trong LAN đều gọi thẳng vào hai cổng đó, bỏ qua TLS và WAF:
+là mọi máy trong LAN đều gọi thẳng vào hai cổng đó, bỏ qua TLS và WAF.
+
+Luật này phải đặt **trên máy app**, không phải trong dashboard aaPanel: tường lửa của
+panel chỉ quản cổng của chính máy aaPanel, còn 4000/4100 nằm ở VM này. Coi LAN
+192.168.79.0/24 là mạng tin cậy thì bỏ qua bước b cũng được — đó là một lựa chọn, miễn
+là lựa chọn có ý thức.
 
 ```bash
 sudo iptables -A INPUT -p tcp -s <IP-LAN-của-máy-aaPanel> --dport 4000 -j ACCEPT
