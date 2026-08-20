@@ -1,6 +1,7 @@
-# Cardano Connect — dự án mẫu kết nối ví
+# Kolo Pay — cổng thanh toán Cardano cho Kolo
 
-Website mẫu cho phép kết nối ví trong hệ sinh thái Cardano, xây trên chuẩn
+Cổng thanh toán Cardano của [Kolo](https://bboapp.xyz): khách trả bằng ADA hoặc
+stablecoin, tiền vào thẳng ví của shop, không qua trung gian. Xây trên chuẩn
 [CIP-30](https://cips.cardano.org/cip/CIP-30) với [Mesh SDK](https://meshjs.dev).
 
 Hỗ trợ mọi ví CIP-30: **Lace, Eternl, Nami, Yoroi, Typhon, Flint, Vespr, NuFi, Gero…**

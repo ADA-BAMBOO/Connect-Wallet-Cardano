@@ -10,12 +10,12 @@ export const en: Dictionary = {
   dateLocale: "en-US",
 
   meta: {
-    homeTitle: "Cardano Connect — CIP-30 wallet demo",
+    homeTitle: "Kolo Pay — the Cardano payment gateway for Kolo",
     homeDescription:
-      "A sample dApp for connecting Cardano ecosystem wallets: wallet discovery, balances and NFTs, signature login, and sending ADA transactions.",
-    ordersTitle: "Order book — Cardano Connect",
-    payTitle: (ref: string) => `Pay ${ref} — Cardano Connect`,
-    payDescription: "Pay with ADA or a stablecoin on Cardano.",
+      "Kolo's Cardano payment gateway: connect a wallet, sign in with a signature, create orders and get paid in ADA or a stablecoin.",
+    ordersTitle: "Order book — Kolo Pay",
+    payTitle: (ref: string) => `Pay ${ref} — Kolo Pay`,
+    payDescription: "Pay Kolo with ADA or a stablecoin on Cardano.",
   },
 
   a11y: {
@@ -30,12 +30,13 @@ export const en: Dictionary = {
   },
 
   shell: {
-    brand: "Cardano Connect",
-    tagline: "CIP-30 wallet demo",
+    brand: "Kolo Pay",
+    tagline: "Cardano payment gateway",
     orderBook: "Order book",
     loadingWallet: "Starting the wallet connection…",
     loadingPay: "Loading the payment page…",
-    footerBuiltWith: "A sample project — built with Next.js and",
+    footerFor: "the Cardano payment gateway for",
+    footerBuiltWith: "Built with Next.js and",
     footerStandard: "Connection standard:",
   },
 
@@ -56,9 +57,9 @@ export const en: Dictionary = {
 
   welcome: {
     badge: "CIP-30 standard · Mesh SDK",
-    headline: "Connect a Cardano wallet",
+    headline: "Take Cardano payments for Kolo",
     intro:
-      "A complete sample: wallet discovery, balances and assets, signature login, and sending ADA transactions — built on the CIP-30 standard with the Mesh SDK.",
+      "Connect a Cardano wallet to sign in with a signature, create orders and get paid in ADA or a stablecoin — on the CIP-30 standard with the Mesh SDK. No middleman: the money lands straight in your own wallet.",
     walletsDetected: (n: number, names: string) =>
       `Detected ${n} ${n === 1 ? "wallet" : "wallets"}: ${names}`,
     noWallets: "No wallet detected in this browser.",
@@ -331,7 +332,7 @@ export const en: Dictionary = {
       "standard and can only describe an ADA amount — it cannot describe a stablecoin, so it only appears when you choose to pay in ADA. If your wallet does not support CIP-13, just pay with the button below.",
     paid: "Paid",
     confirmations: (n: number) => `${n} ${n === 1 ? "confirmation" : "confirmations"}`,
-    backToShop: "Back to the shop",
+    backToShop: "Back to Kolo",
     progressTitle: "Payment progress",
     stepSign: "Sign in the wallet",
     stepBuilding: "Building the transaction…",

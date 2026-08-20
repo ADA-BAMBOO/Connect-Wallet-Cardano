@@ -6,7 +6,7 @@ import { Badge, Button, Modal, Spinner } from "./ui";
 import { describeError } from "@/lib/errors";
 import { useDict } from "@/lib/i18n/client";
 
-const STORAGE_KEY = "cardano-demo:last-wallet";
+const STORAGE_KEY = "kolo-pay:last-wallet";
 
 /** Ví phổ biến để gợi ý cài đặt khi trình duyệt chưa có ví nào. */
 const SUGGESTED_WALLETS = [

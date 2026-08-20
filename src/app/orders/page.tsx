@@ -303,8 +303,10 @@ export default async function OrdersPage({
 
 /* ------------------------------------------------------------------ */
 
-function Shell({ children }: { children: React.ReactNode }) {
+async function Shell({ children }: { children: React.ReactNode }) {
   // Nền trang trí nằm ở root layout (components/Ambient).
+  const t = await getDictionary();
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/70 backdrop-blur-xl">
@@ -326,7 +328,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             >
               <path d="M15 5l-7 7 7 7" />
             </svg>
-            Cardano Connect
+            {t.shell.brand}
           </Link>
           <LanguageSwitcher />
         </div>

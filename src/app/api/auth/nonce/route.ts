@@ -31,11 +31,15 @@ export const runtime = "nodejs";
  * 30 byte ở đây nằm sâu dưới mọi ngưỡng nói trên, kể cả con số 31 byte từng được
  * nhắc tới trong vụ Midnight Glacier Drop.
  *
- * 24 ký tự ngẫu nhiên từ bảng 62 ký tự ≈ 2^143 khả năng — thừa sức cho một nonce.
+ * 19 ký tự ngẫu nhiên từ bảng 62 ký tự ≈ 2^113 khả năng — thừa sức cho một nonce.
+ *
+ * LABEL mang tên thương hiệu để người dùng đọc trên màn hình ví biết mình đang
+ * đăng nhập vào đâu. Đổi LABEL thì phải bù lại RANDOM_LENGTH cho tổng ≤ 31 byte —
+ * hai kiểm tra ngay dưới đây chặn sẵn nếu quên.
  */
 const MAX_PAYLOAD_BYTES = 31;
-const LABEL = "Login ";
-const RANDOM_LENGTH = 24; // 6 + 24 = 30 byte
+const LABEL = "Kolo login ";
+const RANDOM_LENGTH = 19; // 11 + 19 = 30 byte
 
 export async function POST(request: Request) {
   const t = await getDictionary();

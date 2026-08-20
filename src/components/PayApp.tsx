@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { PayOrderCard, type OrderView } from "./PayOrderCard";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { BrandMark } from "./BrandMark";
 import { useDict } from "@/lib/i18n/client";
 
 /**
@@ -28,20 +29,7 @@ export default function PayApp({ orderRef, initial }: { orderRef: string; initia
             className="flex min-h-11 items-center gap-3 rounded-lg pr-2 text-fg-muted
               transition-colors duration-150 hover:text-fg"
           >
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-leaf-500/25
-                bg-gradient-to-br from-brand-500 to-brand-700"
-            >
-              <svg className="h-4 w-4 text-leaf-200" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <circle cx="12" cy="12" r="2.6" />
-                <circle cx="12" cy="4.4" r="1.5" />
-                <circle cx="12" cy="19.6" r="1.5" />
-                <circle cx="5.4" cy="8.2" r="1.5" />
-                <circle cx="18.6" cy="8.2" r="1.5" />
-                <circle cx="5.4" cy="15.8" r="1.5" />
-                <circle cx="18.6" cy="15.8" r="1.5" />
-              </svg>
-            </div>
+            <BrandMark className="h-8 w-8 rounded-lg" />
             <span className="text-sm font-medium">{t.shell.brand}</span>
           </Link>
           <LanguageSwitcher />

@@ -26,7 +26,7 @@ const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 nextEnv.loadEnvConfig(projectDir, false, { info: () => {}, error: console.error });
 
 const BASE = process.argv.find((a) => a.startsWith("http")) ?? "http://localhost:3000";
-const STORAGE_KEY = "cardano-demo:last-wallet";
+const STORAGE_KEY = "kolo-pay:last-wallet";
 const WALLET_NAME = "mockwallet";
 
 let failures = 0;

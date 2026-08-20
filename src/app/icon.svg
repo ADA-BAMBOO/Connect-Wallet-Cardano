@@ -1,0 +1,21 @@
+<!--
+  Icon tab trình duyệt — quy ước file app/icon.svg của Next.
+  Cùng hình chữ K với components/BrandMark, nhưng màu phải viết thẳng: file này
+  nằm ngoài Tailwind nên không đọc được biến trong globals.css.
+    #1f8f3a / #145f26  Primary Green đậm dần (nền)
+    #e2f0b8            Light Green nhạt (nét chữ)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="k" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f8f3a" />
+      <stop offset="1" stop-color="#145f26" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#k)" />
+  <g fill="none" stroke="#e2f0b8" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11.2 6.4v19.2" />
+    <path d="M22.7 7.2 12.8 16.8" />
+    <path d="m16.3 13.5 6.9 11.3" />
+  </g>
+</svg>

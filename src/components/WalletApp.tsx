@@ -11,6 +11,7 @@ import { CreateOrderCard } from "./CreateOrderCard";
 import { FaucetCard } from "./FaucetCard";
 import { WalletDiagnostics } from "./WalletDiagnostics";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { BrandMark } from "./BrandMark";
 import { useDict } from "@/lib/i18n/client";
 
 /**
@@ -35,7 +36,7 @@ function Shell() {
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-3.5">
           <div className="flex min-w-0 items-center gap-3">
-            <CardanoMark />
+            <BrandMark />
             <div className="min-w-0 leading-tight">
               <div className="truncate font-semibold text-fg">{t.shell.brand}</div>
               <div className="truncate text-xs text-fg-subtle">{t.shell.tagline}</div>
@@ -235,25 +236,5 @@ function PaperPlaneIcon() {
       <path d="M21.5 2.5 11 13" />
       <path d="M21.5 2.5 15 21l-4-8-8-4 18.5-6.5Z" />
     </Glyph>
-  );
-}
-
-function CardanoMark() {
-  return (
-    <div
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-leaf-500/25
-        bg-gradient-to-br from-brand-500 to-brand-700
-        shadow-[0_6px_18px_-10px_var(--color-brand-500)]"
-    >
-      <svg className="h-5 w-5 text-leaf-200" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <circle cx="12" cy="12" r="2.6" />
-        <circle cx="12" cy="4.4" r="1.5" />
-        <circle cx="12" cy="19.6" r="1.5" />
-        <circle cx="5.4" cy="8.2" r="1.5" />
-        <circle cx="18.6" cy="8.2" r="1.5" />
-        <circle cx="5.4" cy="15.8" r="1.5" />
-        <circle cx="18.6" cy="15.8" r="1.5" />
-      </svg>
-    </div>
   );
 }

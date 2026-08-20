@@ -100,7 +100,7 @@ try {
   /* --- Trang chủ --- */
   const home = await page.goto(BASE, { waitUntil: "networkidle" });
   assert("trang chủ trả 200", home.status(), 200);
-  assertTrue("trang chủ hiện lời mời kết nối ví", await page.getByText("Kết nối ví Cardano").isVisible());
+  assertTrue("trang chủ hiện lời mời kết nối ví", await page.getByText("Nhận thanh toán Cardano cho Kolo").isVisible());
 
   /* --- Trang thanh toán --- */
   const pay = await page.goto(payUrl, { waitUntil: "networkidle" });

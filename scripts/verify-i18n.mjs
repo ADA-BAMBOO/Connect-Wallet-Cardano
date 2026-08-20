@@ -51,25 +51,25 @@ page.on("pageerror", (err) => pageErrors.push(err.message));
 /* 1. Mặc định: chưa có cookie -> tiếng Việt ------------------------- */
 
 await page.goto(BASE, { waitUntil: "domcontentloaded" });
-await page.getByText("Kết nối ví Cardano").waitFor({ timeout: 30_000 });
+await page.getByText("Nhận thanh toán Cardano cho Kolo").waitFor({ timeout: 30_000 });
 
-assert("mặc định là tiếng Việt", await page.getByText("Kết nối ví Cardano").isVisible(), "true");
+assert("mặc định là tiếng Việt", await page.getByText("Nhận thanh toán Cardano cho Kolo").isVisible(), "true");
 assert('<html lang> mặc định là "vi"', await page.locator("html").getAttribute("lang"), "vi");
 
 /* 2. Bấm EN -> client và server cùng đổi ---------------------------- */
 
 await page.getByRole("button", { name: /English/ }).click();
-await page.getByText("Connect a Cardano wallet").waitFor({ timeout: 30_000 });
+await page.getByText("Take Cardano payments for Kolo").waitFor({ timeout: 30_000 });
 
 assert(
   "bấm EN thì component client đổi sang tiếng Anh",
-  await page.getByText("Connect a Cardano wallet").isVisible(),
+  await page.getByText("Take Cardano payments for Kolo").isVisible(),
   "true",
 );
 assert('<html lang> đổi thành "en"', await page.locator("html").getAttribute("lang"), "en");
 assert(
   "không còn chuỗi tiếng Việt nào của màn hình chào",
-  await page.getByText("Kết nối ví Cardano").isVisible().catch(() => false),
+  await page.getByText("Nhận thanh toán Cardano cho Kolo").isVisible().catch(() => false),
   "false",
 );
 
@@ -83,16 +83,16 @@ assert(
 /* 3. Sống qua reload ------------------------------------------------ */
 
 await page.reload({ waitUntil: "domcontentloaded" });
-await page.getByText("Connect a Cardano wallet").waitFor({ timeout: 30_000 });
+await page.getByText("Take Cardano payments for Kolo").waitFor({ timeout: 30_000 });
 assert(
   "vẫn là tiếng Anh sau khi tải lại trang",
-  await page.getByText("Connect a Cardano wallet").isVisible(),
+  await page.getByText("Take Cardano payments for Kolo").isVisible(),
   "true",
 );
 
 /* 4. Component server: tiêu đề trang + sổ đơn hàng ------------------ */
 
-assert("thẻ <title> cũng đổi theo", (await page.title()).includes("CIP-30 wallet demo"), "true");
+assert("thẻ <title> cũng đổi theo", (await page.title()).includes("the Cardano payment gateway for Kolo"), "true");
 
 await page.goto(`${BASE}/orders`, { waitUntil: "domcontentloaded" });
 const ordersHtml = await page.content();

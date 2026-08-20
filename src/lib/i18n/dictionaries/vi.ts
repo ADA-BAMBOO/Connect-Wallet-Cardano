@@ -15,12 +15,12 @@ export const vi = {
   dateLocale: "vi-VN",
 
   meta: {
-    homeTitle: "Cardano Connect — Demo kết nối ví CIP-30",
+    homeTitle: "Kolo Pay — Cổng thanh toán Cardano cho Kolo",
     homeDescription:
-      "Dự án mẫu kết nối ví hệ sinh thái Cardano: phát hiện ví, đọc số dư và NFT, đăng nhập bằng chữ ký, gửi giao dịch ADA.",
-    ordersTitle: "Sổ đơn hàng — Cardano Connect",
-    payTitle: (ref: string) => `Thanh toán ${ref} — Cardano Connect`,
-    payDescription: "Trả bằng ADA hoặc stablecoin trên Cardano.",
+      "Cổng thanh toán Cardano của Kolo: kết nối ví, đăng nhập bằng chữ ký, tạo đơn hàng và nhận tiền bằng ADA hoặc stablecoin.",
+    ordersTitle: "Sổ đơn hàng — Kolo Pay",
+    payTitle: (ref: string) => `Thanh toán ${ref} — Kolo Pay`,
+    payDescription: "Thanh toán cho Kolo bằng ADA hoặc stablecoin trên Cardano.",
   },
 
   a11y: {
@@ -35,12 +35,13 @@ export const vi = {
   },
 
   shell: {
-    brand: "Cardano Connect",
-    tagline: "Demo kết nối ví CIP-30",
+    brand: "Kolo Pay",
+    tagline: "Cổng thanh toán Cardano",
     orderBook: "Sổ đơn hàng",
     loadingWallet: "Đang khởi tạo kết nối ví…",
     loadingPay: "Đang tải trang thanh toán…",
-    footerBuiltWith: "Dự án mẫu — dựng bằng Next.js và",
+    footerFor: "cổng thanh toán Cardano cho",
+    footerBuiltWith: "Dựng bằng Next.js và",
     footerStandard: "Chuẩn kết nối:",
   },
 
@@ -61,9 +62,9 @@ export const vi = {
 
   welcome: {
     badge: "Chuẩn CIP-30 · Mesh SDK",
-    headline: "Kết nối ví Cardano",
+    headline: "Nhận thanh toán Cardano cho Kolo",
     intro:
-      "Dự án mẫu đầy đủ: phát hiện ví, đọc số dư và tài sản, đăng nhập bằng chữ ký, và gửi giao dịch ADA — xây trên chuẩn CIP-30 với Mesh SDK.",
+      "Kết nối ví Cardano để đăng nhập bằng chữ ký, tạo đơn hàng và nhận tiền bằng ADA hoặc stablecoin — trên chuẩn CIP-30 với Mesh SDK. Không qua trung gian, tiền vào thẳng ví của bạn.",
     walletsDetected: (n: number, names: string) => `Phát hiện ${n} ví: ${names}`,
     noWallets: "Chưa phát hiện ví nào trong trình duyệt.",
     detectTitle: "Phát hiện ví",
@@ -329,7 +330,7 @@ export const vi = {
       "và chỉ mô tả được số ADA — nó không mô tả được stablecoin, nên chỉ hiện khi bạn chọn trả bằng ADA. Ví không hỗ trợ CIP-13 thì cứ trả bằng nút bên dưới.",
     paid: "Đã thanh toán",
     confirmations: (n: number) => `${n} xác nhận`,
-    backToShop: "Quay lại cửa hàng",
+    backToShop: "Quay lại Kolo",
     progressTitle: "Tiến trình thanh toán",
     stepSign: "Ký trong ví",
     stepBuilding: "Đang dựng giao dịch…",

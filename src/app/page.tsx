@@ -11,7 +11,21 @@ export default async function Home() {
       <WalletAppLoader />
 
       <footer className="mt-auto border-t border-hairline">
-        <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-fg-subtle">
+        <div className="mx-auto max-w-5xl space-y-2 px-6 py-8 text-sm text-fg-subtle">
+          <p className="leading-relaxed">
+            <span className="text-fg-muted">{t.shell.brand}</span> — {t.shell.footerFor}{" "}
+            <a
+              href="https://bboapp.xyz"
+              target="_blank"
+              rel="noreferrer"
+              className="text-fg-muted underline decoration-hairline-strong underline-offset-4
+                transition-colors duration-150 hover:text-brand-300 hover:decoration-brand-400"
+            >
+              Kolo
+            </a>
+            .
+          </p>
+
           <p className="leading-relaxed">
             {t.shell.footerBuiltWith}{" "}
             <a
