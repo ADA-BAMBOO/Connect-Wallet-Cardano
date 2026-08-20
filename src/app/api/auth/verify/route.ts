@@ -8,6 +8,7 @@ import {
   getSessionSecretError,
   isValidLoginAddress,
 } from "@/lib/auth-server";
+import { getDictionary } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
@@ -19,9 +20,11 @@ type Body = {
 export async function POST(request: Request) {
   // Kiểm tra cấu hình TRƯỚC khi làm gì khác, để lỗi thiếu env hiện ra thành thông
   // báo rõ ràng thay vì làm handler chết với body rỗng.
-  const configError = getSessionSecretError();
-  if (configError) {
-    return NextResponse.json({ error: configError }, { status: 500 });
+  const t = await getDictionary();
+  // getSessionSecretError() chỉ dùng để PHÁT HIỆN thiếu cấu hình; câu chữ lấy từ
+  // từ điển để lỗi 500 cũng nói đúng ngôn ngữ người dùng đang xem.
+  if (getSessionSecretError()) {
+    return NextResponse.json({ error: t.api.missingSessionSecret }, { status: 500 });
   }
 
   let body: Body;
@@ -29,24 +32,24 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "Body không phải JSON hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.badJson }, { status: 400 });
   }
 
   const { address, signature } = body;
 
   if (!isValidLoginAddress(address)) {
-    return NextResponse.json({ error: "Địa chỉ không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.invalidAddress }, { status: 400 });
   }
 
   if (typeof signature?.signature !== "string" || typeof signature?.key !== "string") {
-    return NextResponse.json({ error: "Thiếu chữ ký (signature/key)." }, { status: 400 });
+    return NextResponse.json({ error: t.api.missingSignature }, { status: 400 });
   }
 
   // Nonce dùng một lần: lấy ra là xoá, dù xác minh thành công hay không.
   const nonce = await consumeNonce(address);
   if (!nonce) {
     return NextResponse.json(
-      { error: "Nonce đã hết hạn hoặc không tồn tại. Hãy thử đăng nhập lại." },
+      { error: t.api.nonceGone },
       { status: 400 },
     );
   }
@@ -63,12 +66,12 @@ export async function POST(request: Request) {
   }
 
   if (!valid) {
-    return NextResponse.json({ error: "Chữ ký không hợp lệ." }, { status: 401 });
+    return NextResponse.json({ error: t.api.badSignature }, { status: 401 });
   }
 
   const token = createSessionToken(address);
   if (!token) {
-    return NextResponse.json({ error: getSessionSecretError() }, { status: 500 });
+    return NextResponse.json({ error: t.api.missingSessionSecret }, { status: 500 });
   }
 
   // Chữ ký hợp lệ → cấp session. Cookie httpOnly để JS phía client không đọc được.

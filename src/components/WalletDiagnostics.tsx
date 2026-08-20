@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Alert, Badge, Button, Card } from "./ui";
 import { describeError, readJsonResponse, walletErrorCode } from "@/lib/errors";
 import { truncate } from "@/lib/format";
+import { useDict } from "@/lib/i18n/client";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 /**
  * Công cụ chẩn đoán ví, chia làm hai pha để tránh "popup fatigue".
@@ -54,6 +56,7 @@ async function hexToBech32(addrHex: string): Promise<string> {
 }
 
 export function WalletDiagnostics() {
+  const t = useDict();
   const [scanning, setScanning] = useState(false);
   const [wallets, setWallets] = useState<WalletInfo[] | null>(null);
   const [results, setResults] = useState<SignResult[]>([]);
@@ -110,7 +113,7 @@ export function WalletDiagnostics() {
       for (const [label, method, pick] of probes) {
         const fn = api[method];
         if (typeof fn !== "function") {
-          info.addresses.push({ label, error: `ví không có hàm ${method}()` });
+          info.addresses.push({ label, error: t.diagnostics.noMethod(method) });
           continue;
         }
         try {
@@ -122,7 +125,10 @@ export function WalletDiagnostics() {
           if (!hex) {
             info.addresses.push({
               label,
-              error: `${method}() trả về ${Array.isArray(raw) ? `mảng rỗng (${raw.length} phần tử)` : JSON.stringify(raw)}`,
+              error: t.diagnostics.emptyResult(
+                method,
+                Array.isArray(raw) ? t.diagnostics.emptyArray(raw.length) : JSON.stringify(raw),
+              ),
             });
           } else {
             info.addresses.push({ label, hex });
@@ -130,7 +136,7 @@ export function WalletDiagnostics() {
         } catch (err) {
           info.addresses.push({
             label,
-            error: `${method}() lỗi: ${describeError(err)}${
+            error: `${t.diagnostics.methodError(method, describeError(err))}${
               walletErrorCode(err) != null ? ` (code=${walletErrorCode(err)})` : ""
             }`,
           });
@@ -178,7 +184,13 @@ export function WalletDiagnostics() {
 
       setResults((r) => [
         ...r,
-        { key, path, label: `${walletName} · ${addrLabel} · ${path === "raw" ? "CIP-30 thô" : "qua Mesh"}`, ok: true, detail: "ký thành công" },
+        {
+          key,
+          path,
+          label: `${walletName} · ${addrLabel} · ${path === "raw" ? t.diagnostics.rawPath : t.diagnostics.meshPath}`,
+          ok: true,
+          detail: t.diagnostics.signOk,
+        },
       ]);
     } catch (err) {
       setResults((r) => [
@@ -186,7 +198,7 @@ export function WalletDiagnostics() {
         {
           key,
           path,
-          label: `${walletName} · ${addrLabel} · ${path === "raw" ? "CIP-30 thô" : "qua Mesh"}`,
+          label: `${walletName} · ${addrLabel} · ${path === "raw" ? t.diagnostics.rawPath : t.diagnostics.meshPath}`,
           ok: false,
           detail: describeError(err),
           code: walletErrorCode(err),
@@ -213,7 +225,7 @@ export function WalletDiagnostics() {
         body: JSON.stringify({ address: bech32 }),
       });
       const noncePayload = await readJsonResponse<{ nonce: string; error?: string }>(nonceRes);
-      if (!("nonce" in noncePayload)) throw new Error(noncePayload.error ?? "không lấy được nonce");
+      if (!("nonce" in noncePayload)) throw new Error(noncePayload.error ?? t.diagnostics.nonceFailed);
 
       const signature = await wallet.signData(noncePayload.nonce, bech32);
 
@@ -223,11 +235,17 @@ export function WalletDiagnostics() {
         body: JSON.stringify({ address: bech32, signature }),
       });
       const verifyPayload = await readJsonResponse<{ error?: string }>(verifyRes);
-      if (!verifyRes.ok) throw new Error(verifyPayload.error ?? "verify thất bại");
+      if (!verifyRes.ok) throw new Error(verifyPayload.error ?? t.diagnostics.verifyFailed);
 
       setResults((r) => [
         ...r,
-        { key, path: "login", label: `${walletName} · ${addrLabel} · ĐĂNG NHẬP TRỌN LUỒNG`, ok: true, detail: "thành công, server đã xác minh chữ ký" },
+        {
+          key,
+          path: "login",
+          label: `${walletName} · ${addrLabel} · ${t.diagnostics.loginPath}`,
+          ok: true,
+          detail: t.diagnostics.loginOk,
+        },
       ]);
     } catch (err) {
       setResults((r) => [
@@ -235,7 +253,7 @@ export function WalletDiagnostics() {
         {
           key,
           path: "login",
-          label: `${walletName} · ${addrLabel} · ĐĂNG NHẬP TRỌN LUỒNG`,
+          label: `${walletName} · ${addrLabel} · ${t.diagnostics.loginPath}`,
           ok: false,
           detail: describeError(err),
           code: walletErrorCode(err),
@@ -246,23 +264,22 @@ export function WalletDiagnostics() {
     }
   }
 
-  const report = buildReport(wallets, results);
+  const report = buildReport(wallets, results, t);
 
   return (
     <Card
-      title="Chẩn đoán ví"
-      description="Khoanh vùng lỗi: ví, lớp Mesh, hay server"
+      title={t.diagnostics.title}
+      description={t.diagnostics.description}
       icon={<StethoscopeIcon />}
     >
       <div className="space-y-5">
         <Alert tone="info">
-          <strong>Bước 1</strong> chỉ đọc thông tin, không mở popup nào. Sau đó bạn tự chọn từng
-          phép ký ở <strong>bước 2</strong> — mỗi phép ký là một popup, làm từng cái để kết quả
-          đáng tin (bấm huỷ vì mỏi tay sẽ cho số liệu sai).
+          <strong>{t.diagnostics.intro1}</strong> {t.diagnostics.intro2}{" "}
+          <strong>{t.diagnostics.intro3}</strong> {t.diagnostics.intro4}
         </Alert>
 
         <Button onClick={scan} loading={scanning} variant="secondary">
-          {scanning ? "Đang dò…" : "Bước 1 — Dò ví (không popup)"}
+          {scanning ? t.diagnostics.scanning : t.diagnostics.scan}
         </Button>
 
         {wallets?.map((w) => (
@@ -272,13 +289,13 @@ export function WalletDiagnostics() {
               {w.enabled ? <Badge tone="success">enable OK</Badge> : <Badge tone="danger">enable FAIL</Badge>}
               {w.enabled && (
                 <Badge tone={w.hasSignData ? "success" : "danger"}>
-                  {w.hasSignData ? "có signData" : "không có signData"}
+                  {w.hasSignData ? t.diagnostics.hasSignData : t.diagnostics.noSignData}
                 </Badge>
               )}
               {w.networkId !== undefined && (
                 <Badge tone="info">network {w.networkId === 1 ? "mainnet" : "testnet"} ({w.networkId})</Badge>
               )}
-              {w.networkError && <Badge tone="danger">networkId lỗi</Badge>}
+              {w.networkError && <Badge tone="danger">{t.diagnostics.networkError}</Badge>}
             </div>
 
             {w.enableError && (
@@ -308,7 +325,7 @@ export function WalletDiagnostics() {
                           loading={busyKey === `${w.name}:${a.label}:raw`}
                           onClick={() => trySign(w.name, a.label, a.hex!, "raw")}
                         >
-                          Ký · CIP-30 thô
+                          {t.diagnostics.signRaw}
                         </Button>
                         <Button
                           size="sm"
@@ -316,7 +333,7 @@ export function WalletDiagnostics() {
                           loading={busyKey === `${w.name}:${a.label}:mesh`}
                           onClick={() => trySign(w.name, a.label, a.hex!, "mesh")}
                         >
-                          Ký · qua Mesh
+                          {t.diagnostics.signMesh}
                         </Button>
                         <Button
                           size="sm"
@@ -324,7 +341,7 @@ export function WalletDiagnostics() {
                           loading={busyKey === `${w.name}:${a.label}:login`}
                           onClick={() => tryFullLogin(w.name, a.hex!, a.label)}
                         >
-                          Đăng nhập trọn luồng
+                          {t.diagnostics.signLogin}
                         </Button>
                       </div>
                     )}
@@ -337,7 +354,7 @@ export function WalletDiagnostics() {
 
         {results.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-fg">Kết quả ký</h3>
+            <h3 className="text-sm font-medium text-fg">{t.diagnostics.results}</h3>
             <ul className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline">
               {results.map((r, i) => (
                 <li key={i} className="flex items-start gap-3 bg-ink-950/50 px-3.5 py-2.5">
@@ -377,7 +394,7 @@ export function WalletDiagnostics() {
               }
             }}
           >
-            {copied ? "Đã sao chép" : "Sao chép toàn bộ kết quả"}
+            {copied ? t.diagnostics.copied : t.diagnostics.copyAll}
           </Button>
         )}
       </div>
@@ -385,23 +402,32 @@ export function WalletDiagnostics() {
   );
 }
 
-function buildReport(wallets: WalletInfo[] | null, results: SignResult[]): string {
+/** Nhận từ điển qua tham số: hàm chạy ngoài thân component nên không gọi hook được. */
+function buildReport(
+  wallets: WalletInfo[] | null,
+  results: SignResult[],
+  t: Dictionary,
+): string {
   const lines: string[] = [];
 
   for (const w of wallets ?? []) {
     lines.push(`## ${w.name}`);
     lines.push(`  enable: ${w.enabled ? "OK" : `FAIL — ${w.enableError}`}`);
     if (w.enabled) {
-      lines.push(`  signData: ${w.hasSignData ? "có" : "KHÔNG"}`);
-      lines.push(`  networkId: ${w.networkId ?? `lỗi — ${w.networkError}`}`);
+      lines.push(`  signData: ${w.hasSignData ? t.diagnostics.reportYes : t.diagnostics.reportNo}`);
+      lines.push(
+        `  networkId: ${w.networkId ?? `${t.diagnostics.reportError} — ${w.networkError}`}`,
+      );
       for (const a of w.addresses) {
-        lines.push(`  ${a.label}: ${a.hex ? a.hex : `KHÔNG CÓ — ${a.error}`}`);
+        lines.push(
+          `  ${a.label}: ${a.hex ? a.hex : `${t.diagnostics.reportMissing} — ${a.error}`}`,
+        );
       }
     }
   }
 
   if (results.length > 0) {
-    lines.push("", "## Kết quả ký");
+    lines.push("", `## ${t.diagnostics.results}`);
     for (const r of results) {
       lines.push(`  [${r.ok ? "OK" : "FAIL"}] ${r.label}: ${r.detail}${r.code != null ? ` (code=${r.code})` : ""}`);
     }

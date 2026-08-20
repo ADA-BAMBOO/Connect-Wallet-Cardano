@@ -10,6 +10,7 @@ import {
   isUserDeclined,
   readJsonResponse,
 } from "@/lib/errors";
+import { useDict } from "@/lib/i18n/client";
 
 type Session = {
   authenticated: boolean;
@@ -20,6 +21,7 @@ type Session = {
 
 export function SignInCard() {
   const { wallet, connected } = useWallet();
+  const t = useDict();
 
   const [session, setSession] = useState<Session | null>(null);
   const [busy, setBusy] = useState(false);
@@ -69,7 +71,7 @@ export function SignInCard() {
       const candidates = [stakeAddress, changeAddress].filter(
         (a): a is string => typeof a === "string" && a.length > 0,
       );
-      if (candidates.length === 0) throw new Error("Ví không trả về địa chỉ nào.");
+      if (candidates.length === 0) throw new Error(t.signIn.noAddress);
 
       let lastError: unknown = null;
 
@@ -83,7 +85,7 @@ export function SignInCard() {
           });
           const noncePayload = await readJsonResponse<{ nonce: string; error?: string }>(nonceRes);
           if (!nonceRes.ok || !("nonce" in noncePayload)) {
-            throw new Error(noncePayload.error ?? "Không lấy được nonce.");
+            throw new Error(noncePayload.error ?? t.signIn.nonceFailed);
           }
 
           // 3. Ví mở popup cho người dùng ký. Đây là thao tác OFF-CHAIN:
@@ -97,7 +99,7 @@ export function SignInCard() {
             body: JSON.stringify({ address, signature }),
           });
           const verifyPayload = await readJsonResponse<{ error?: string }>(verifyRes);
-          if (!verifyRes.ok) throw new Error(verifyPayload.error ?? "Xác minh chữ ký thất bại.");
+          if (!verifyRes.ok) throw new Error(verifyPayload.error ?? t.signIn.verifyFailed);
 
           lastError = null;
           break;
@@ -122,7 +124,7 @@ export function SignInCard() {
       setSession(await refreshSession());
     } catch (err) {
       if (isUserDeclined(err, "data")) {
-        setError("Bạn đã huỷ ký.");
+        setError(t.signIn.declined);
       } else if (isDataSigningUnsupported(err)) {
         setUnsupported(describeError(err));
       } else {
@@ -147,14 +149,14 @@ export function SignInCard() {
 
   return (
     <Card
-      title="Đăng nhập bằng ví"
-      description="Ký thông điệp theo CIP-8 / CIP-30 — không tốn phí, không tạo giao dịch"
+      title={t.signIn.title}
+      description={t.signIn.description}
       icon={<KeyIcon />}
       action={
         authenticated ? (
-          <Badge tone="success">Đã xác thực</Badge>
+          <Badge tone="success">{t.signIn.authenticated}</Badge>
         ) : (
-          <Badge>Chưa đăng nhập</Badge>
+          <Badge>{t.signIn.notAuthenticated}</Badge>
         )
       }
     >
@@ -162,71 +164,62 @@ export function SignInCard() {
         {authenticated ? (
           <>
             <Alert tone="success">
-              Server đã xác minh chữ ký và cấp session cookie (httpOnly, hết hạn sau 1 giờ).
+              {t.signIn.sessionGranted}
             </Alert>
             <CopyableField
               label={
                 session?.isStakeAddress
-                  ? "Danh tính đã xác thực (stake address)"
-                  : "Danh tính đã xác thực (payment address)"
+                  ? t.signIn.identityStake
+                  : t.signIn.identityPayment
               }
               value={session?.address ?? ""}
               display={truncate(session?.address, 16, 10)}
             />
             {session?.expiresAt && (
               <p className="text-xs text-fg-subtle">
-                Session hết hạn lúc {new Date(session.expiresAt).toLocaleString("vi-VN")}
+                {t.signIn.expiresAt(new Date(session.expiresAt).toLocaleString(t.dateLocale))}
               </p>
             )}
             <Button variant="secondary" onClick={signOut} loading={busy}>
-              Đăng xuất
+              {t.signIn.signOut}
             </Button>
           </>
         ) : (
           <>
             <ol className="space-y-2 text-sm text-fg-muted">
-              <Step n={1}>Server sinh một nonce ngẫu nhiên, dùng một lần.</Step>
-              <Step n={2}>
-                Ví ký nonce bằng private key của địa chỉ stake (fallback sang payment address
-                nếu ví không hỗ trợ).
-              </Step>
-              <Step n={3}>
-                Server kiểm tra chữ ký khớp đúng địa chỉ đó → cấp session, không cần mật khẩu.
-              </Step>
+              <Step n={1}>{t.signIn.step1}</Step>
+              <Step n={2}>{t.signIn.step2}</Step>
+              <Step n={3}>{t.signIn.step3}</Step>
             </ol>
 
             {error && <Alert tone="danger">{error}</Alert>}
 
             {unsupported && (
               <Alert tone="warning">
-                <div className="font-medium">Ví từ chối ký dữ liệu</div>
+                <div className="font-medium">{t.signIn.unsupportedTitle}</div>
                 <p className="mt-1 opacity-90">
-                  Ví báo: <em>“{unsupported}”</em>
+                  <em>{t.signIn.unsupportedSays(unsupported)}</em>
                 </p>
                 <p className="mt-2">
-                  Đã thử cả địa chỉ stake lẫn địa chỉ payment nhưng đều bị từ chối. Với Eternl,
-                  đây là lỗi <code className="font-mono">unsupportedWalletType</code> — phụ thuộc{" "}
-                  <strong>loại ví</strong>, không phải lỗi của trang này, và không có cách nào
-                  vòng qua từ phía dApp.
+                  {t.signIn.unsupportedBody1}{" "}
+                  <code className="font-mono">unsupportedWalletType</code>{" "}
+                  {t.signIn.unsupportedBody2}
                 </p>
                 <p className="mt-2 text-xs opacity-90">
-                  Loại ví thường bị chặn: hardware wallet, multi-sig / shared, và read-only
-                  (thêm bằng địa chỉ). Hãy mở Eternl, kiểm tra loại của ví đang kết nối, rồi
-                  chuyển sang một ví <strong>mnemonic</strong> (tạo từ seed phrase).
+                  {t.signIn.unsupportedTypes}
                 </p>
                 <p className="mt-2 text-xs opacity-90">
-                  Muốn biết chính xác địa chỉ nào ký được? Chạy <strong>Chẩn đoán ví</strong> ở
-                  cuối trang — nó thử từng loại địa chỉ và hiện mã lỗi thô của ví.
+                  {t.signIn.unsupportedDiagnose1} <strong>{t.diagnostics.title}</strong>{" "}
+                  {t.signIn.unsupportedDiagnose2}
                 </p>
                 <p className="mt-2 text-xs opacity-90">
-                  Các tính năng khác vẫn chạy bình thường — chỉ đăng nhập bằng chữ ký là cần khoá
-                  ký.
+                  {t.signIn.unsupportedOthers}
                 </p>
               </Alert>
             )}
 
             <Button onClick={signIn} disabled={!connected} loading={busy}>
-              {busy ? "Đang chờ ví ký…" : "Ký để đăng nhập"}
+              {busy ? t.signIn.waitingSignature : t.signIn.signToLogin}
             </Button>
           </>
         )}

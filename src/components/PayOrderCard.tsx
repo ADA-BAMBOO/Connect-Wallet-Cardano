@@ -11,6 +11,7 @@ import { describeError, isUserDeclined } from "@/lib/errors";
 import { cip13PaymentUri } from "@/lib/cip13";
 import { truncate } from "@/lib/format";
 import { useNetworkId } from "@/lib/use-wallet-data";
+import { useDict } from "@/lib/i18n/client";
 
 /**
  * Trang thanh toán: chọn token, ký, rồi theo dõi cho tới khi đơn được xác nhận.
@@ -87,6 +88,7 @@ export type OrderView = { order: Order; tokens: TokenOption[] };
 export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial: OrderView }) {
   const { wallet, connected } = useWallet();
   const walletList = useWalletList();
+  const t = useDict();
   const walletNetworkId = useNetworkId();
 
   // Dữ liệu ban đầu do server component đưa xuống, nên không có trạng thái "đang
@@ -109,7 +111,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
       const res = await fetch(`/api/payments/orders/${orderRef}`);
       const data = await res.json();
       if (!res.ok) {
-        setLoadError(data.error ?? `Không đọc được đơn (HTTP ${res.status}).`);
+        setLoadError(data.error ?? t.pay.loadFailed(res.status));
         return null;
       }
       setOrder(data.order);
@@ -120,7 +122,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
       setLoadError(err instanceof Error ? err.message : String(err));
       return null;
     }
-  }, [orderRef]);
+  }, [orderRef, t.pay]);
 
   // Chỉ poll khi còn có thể thay đổi. Đơn đã `confirmed`/`expired` thì dừng hẳn —
   // để một tab bỏ quên không gọi API mãi mãi.
@@ -152,7 +154,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
         body: JSON.stringify({ unit }),
       });
       const data = await res.json();
-      if (!res.ok) setPayError(data.error ?? `Khoá giá thất bại (HTTP ${res.status}).`);
+      if (!res.ok) setPayError(data.error ?? t.pay.quoteFailed(res.status));
       else setOrder(data.order);
     } catch (err) {
       setPayError(err instanceof Error ? err.message : String(err));
@@ -210,7 +212,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
       setPayStage(null);
       // Ví CIP-30 ném object { code, info } chứ không phải Error — xem lib/errors.ts.
       setPayError(
-        isUserDeclined(err, "tx") ? "Bạn đã huỷ ký giao dịch." : `Thanh toán thất bại: ${describeError(err)}`,
+        isUserDeclined(err, "tx") ? t.pay.declined : t.pay.payFailed(describeError(err)),
       );
     } finally {
       setBusy(null);
@@ -233,12 +235,12 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
   return (
     <div className="space-y-5">
       {/* Lỗi khi poll không được xoá màn hình: dữ liệu cũ vẫn đúng và vẫn hữu ích. */}
-      {loadError && <Alert tone="warning">Không cập nhật được trạng thái: {loadError}</Alert>}
+      {loadError && <Alert tone="warning">{t.pay.statusStale(loadError)}</Alert>}
 
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="font-mono text-sm text-fg-subtle">Đơn {order.ref}</div>
+            <div className="font-mono text-sm text-fg-subtle">{t.pay.order(order.ref)}</div>
             <div className="mt-1 text-3xl font-semibold tabular-nums text-fg sm:text-4xl">
               {order.amountUsd} <span className="text-2xl text-fg-muted sm:text-3xl">USD</span>
             </div>
@@ -249,7 +251,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
 
         {order.status === "pending" && !dead && (
           <p className="mt-4 text-xs text-fg-subtle">
-            Đơn hết hạn lúc {new Date(order.expiresAt).toLocaleString("vi-VN")}
+            {t.pay.expiresAt(new Date(order.expiresAt).toLocaleString(t.dateLocale))}
           </p>
         )}
       </Card>
@@ -257,19 +259,18 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
       {done && <ConfirmedPanel order={order} explorer={explorer} />}
 
       {order.status === "underpaid" && (
-        <Card title="Nhận thiếu tiền">
+        <Card title={t.pay.underpaidTitle}>
           <Alert tone="warning">
-            Đã nhận {order.tx?.receivedQuantity} nhưng đơn yêu cầu {order.payment?.quantity}. Liên hệ
-            người bán để được xử lý — giao dịch vẫn nằm trên chain.
+            {t.pay.underpaidBody(order.tx?.receivedQuantity ?? "", order.payment?.quantity ?? "")}
           </Alert>
         </Card>
       )}
 
       {dead && (
-        <Card title="Đơn không còn hiệu lực">
+        <Card title={t.pay.deadTitle}>
           <Alert tone="danger">
-            Đơn này đã {order.status === "expired" ? "hết hạn" : "thất bại"}. Hãy xin người bán tạo
-            đơn mới — <strong>đừng gửi tiền</strong> cho đơn này nữa.
+            {t.pay.deadBody1} {order.status === "expired" ? t.pay.deadExpired : t.pay.deadFailed}.{" "}
+            {t.pay.deadBody2} <strong>{t.pay.deadBody3}</strong> {t.pay.deadBody4}
           </Alert>
         </Card>
       )}
@@ -292,7 +293,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
 
       {!inFlight && !done && !dead && order.status !== "underpaid" && (
         <>
-          <Card title="Chọn cách trả" description="Stablecoin quy đổi 1:1, ADA theo tỷ giá thị trường">
+          <Card title={t.pay.chooseTitle} description={t.pay.chooseDescription}>
             <div className="grid gap-2 sm:grid-cols-2">
               {tokens.map((token) => {
                 const active = order.payment?.unit === token.unit;
@@ -318,9 +319,9 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
                     {busy === token.unit ? (
                       <Spinner className="text-brand-400" />
                     ) : !token.available ? (
-                      <Badge tone="warning">lệch peg</Badge>
+                      <Badge tone="warning">{t.pay.depegged}</Badge>
                     ) : active ? (
-                      <Badge tone="info">đã chọn</Badge>
+                      <Badge tone="info">{t.pay.selected}</Badge>
                     ) : null}
                   </button>
                 );
@@ -329,8 +330,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
 
             {tokens.some((t) => !t.available) && (
               <p className="mt-3 text-xs leading-relaxed text-fg-subtle">
-                Token bị đánh dấu <em>lệch peg</em> đang giao dịch cách xa mốc 1 USD nên tạm không
-                nhận — trả bằng nó là bạn chịu thiệt.
+                {t.pay.depegNote1} <em>{t.pay.depegged}</em> {t.pay.depegNote2}
               </p>
             )}
 
@@ -340,11 +340,11 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
             */}
             {order.network === "preprod" && (
               <p className="mt-3 text-xs leading-relaxed text-fg-subtle">
-                Chưa có token thử trong ví?{" "}
+                {t.pay.noTestToken1}{" "}
                 <Link href="/" className="text-brand-400 underline underline-offset-2">
-                  Lấy miễn phí ở faucet
+                  {t.pay.noTestToken2}
                 </Link>{" "}
-                trên trang chủ.
+                {t.pay.noTestToken3}
               </p>
             )}
           </Card>
@@ -367,7 +367,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
             và cũng không có gì gợi ý rằng phải chọn token trước. Nút bị vô hiệu hoá
             kèm lý do vẫn tốt hơn nhiều so với một nút không tồn tại.
           */}
-          <Card title="Trả bằng ví">
+          <Card title={t.pay.payWithWallet}>
             {walletList.length === 0 ? (
               <NoWalletHelp orderRef={order.ref} />
             ) : (
@@ -375,8 +375,7 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
                 {!connected && (
                   <>
                     <p className="text-sm text-fg-muted">
-                      Kết nối ví để ký giao dịch. Ví sẽ mở popup cho bạn xác nhận —
-                      website không bao giờ chạm được vào private key.
+                      {t.pay.connectToSign}
                     </p>
                     <ConnectWallet />
                   </>
@@ -394,21 +393,20 @@ export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial:
                       disabled={busy !== null || !payReady}
                     >
                       {busy === "pay"
-                        ? "Đang xử lý…"
+                        ? t.pay.processing
                         : payReady
-                          ? `Trả ${order.payment!.quantityFormatted} ${order.payment!.symbol}`
-                          : "Chọn cách trả ở trên"}
+                          ? t.pay.payAmount(order.payment!.quantityFormatted, order.payment!.symbol ?? "")
+                          : t.pay.chooseFirst}
                     </Button>
 
                     {!order.payment && (
                       <p className="text-xs text-fg-subtle">
-                        Chọn ADA hoặc một stablecoin ở khối phía trên, hệ thống sẽ tính số
-                        tiền phải trả rồi mở ví để bạn ký.
+                        {t.pay.chooseHint}
                       </p>
                     )}
                     {order.payment?.quoteExpired && (
                       <p className="text-xs text-warn-400">
-                        Báo giá đã hết hạn — lấy báo giá mới ở khối phía trên trước khi trả.
+                        {t.pay.quoteExpiredHint}
                       </p>
                     )}
                   </>
@@ -438,6 +436,7 @@ function QuotePanel({
   onRequote: () => void;
   requoting: boolean;
 }) {
+  const t = useDict();
   const expiresAt = payment.quoteExpiresAt ? new Date(payment.quoteExpiresAt).getTime() : null;
   const secondsLeft = expiresAt === null ? null : Math.max(0, Math.round((expiresAt - now) / 1000));
   const expired = payment.quoteExpired || secondsLeft === 0;
@@ -446,7 +445,7 @@ function QuotePanel({
     payment.unit === "lovelace" ? cip13PaymentUri(order.merchantAddress, BigInt(payment.quantity)) : null;
 
   return (
-    <Card title="Số tiền phải trả">
+    <Card title={t.pay.quoteTitle}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="font-mono text-3xl font-semibold tabular-nums text-fg sm:text-4xl">
@@ -455,46 +454,46 @@ function QuotePanel({
           </div>
           {secondsLeft !== null && !expired && (
             <Badge tone={secondsLeft < 120 ? "warning" : "neutral"}>
-              Khoá giá còn {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
+              {t.pay.quoteCountdown(
+                `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`,
+              )}
             </Badge>
           )}
         </div>
 
         {payment.adaRateUsd && (
           <p className="text-xs text-fg-subtle">
-            Tỷ giá đã khoá: 1 ADA = {payment.adaRateUsd} USD
-            {payment.rateSources?.length ? ` · trung vị của ${payment.rateSources.join(", ")}` : ""}
+            {t.pay.rateLocked(payment.adaRateUsd)}
+            {payment.rateSources?.length ? t.pay.rateSources(payment.rateSources.join(", ")) : ""}
           </p>
         )}
 
         {!payment.adaRateUsd && (
           <p className="text-xs text-fg-subtle">
-            Stablecoin quy ước 1 token = 1 USD nên không có tỷ giá nào để hết hạn.
+            {t.pay.stableNote}
           </p>
         )}
 
         {expired && (
           <Alert tone="warning">
-            <div>Báo giá đã hết hạn — tỷ giá ADA đã thay đổi.</div>
+            <div>{t.pay.quoteExpired}</div>
             <Button variant="secondary" size="sm" className="mt-2" onClick={onRequote} loading={requoting}>
-              Lấy báo giá mới
+              {t.pay.requote}
             </Button>
           </Alert>
         )}
 
         <CopyableField
-          label="Địa chỉ nhận"
+          label={t.pay.merchantAddress}
           value={order.merchantAddress}
           display={truncate(order.merchantAddress, 18, 10)}
         />
 
         {cip13 && !expired && (
           <div className="flex flex-col gap-4 border-t border-hairline pt-4 sm:flex-row sm:items-center">
-            <PaymentQr value={cip13} label="Quét bằng ví hỗ trợ CIP-13" />
+            <PaymentQr value={cip13} label={t.pay.qrLabel} />
             <p className="text-xs leading-relaxed text-fg-subtle">
-              Mã này theo chuẩn <strong>CIP-13</strong> và chỉ mô tả được số ADA — nó không mô tả
-              được stablecoin, nên chỉ hiện khi bạn chọn trả bằng ADA. Ví không hỗ trợ CIP-13 thì
-              cứ trả bằng nút bên dưới.
+              {t.pay.cip13Note1} <strong>CIP-13</strong> {t.pay.cip13Note2}
             </p>
           </div>
         )}
@@ -504,6 +503,8 @@ function QuotePanel({
 }
 
 function ConfirmedPanel({ order, explorer }: { order: Order; explorer: string }) {
+  const t = useDict();
+
   return (
     <Card>
       <div className="motion-safe:animate-rise flex items-start gap-4">
@@ -513,11 +514,13 @@ function ConfirmedPanel({ order, explorer }: { order: Order; explorer: string })
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-lg font-semibold text-brand-200">Đã thanh toán</div>
+          <div className="text-lg font-semibold text-brand-200">{t.pay.paid}</div>
           <p className="mt-1 text-sm text-fg-muted">
-            {order.payment?.quantityFormatted} {order.payment?.symbol} · {order.tx?.confirmations} xác
-            nhận
-            {order.confirmedAt ? ` · ${new Date(order.confirmedAt).toLocaleString("vi-VN")}` : ""}
+            {order.payment?.quantityFormatted} {order.payment?.symbol} ·{" "}
+            {t.pay.confirmations(order.tx?.confirmations ?? 0)}
+            {order.confirmedAt
+              ? ` · ${new Date(order.confirmedAt).toLocaleString(t.dateLocale)}`
+              : ""}
           </p>
           {order.tx && (
             <a
@@ -542,7 +545,7 @@ function ConfirmedPanel({ order, explorer }: { order: Order; explorer: string })
               href={order.returnUrl}
               className="mt-4 inline-flex items-center gap-2 rounded-lg border border-brand-500/30 bg-brand-500/10 px-4 py-2 text-sm font-medium text-brand-200 transition hover:bg-brand-500/20"
             >
-              Quay lại cửa hàng
+              {t.pay.backToShop}
               <span aria-hidden>→</span>
             </a>
           )}
@@ -586,6 +589,8 @@ function PaymentProgress({
     (order.tx?.blockHeight ?? null) !== null ||
     order.status === "seen";
 
+  const t = useDict();
+
   const signed = stage === "submitting" || stage === "submitted" || Boolean(txHash);
   const submitted = Boolean(txHash);
   const done = order.status === "confirmed";
@@ -593,18 +598,18 @@ function PaymentProgress({
   const steps: { key: string; label: string; state: StepState; detail?: React.ReactNode }[] = [
     {
       key: "sign",
-      label: "Ký trong ví",
+      label: t.pay.stepSign,
       state: signed ? "done" : stage === "signing" ? "active" : stage === "building" ? "active" : "todo",
       detail:
         stage === "building"
-          ? "Đang dựng giao dịch…"
+          ? t.pay.stepBuilding
           : stage === "signing"
-            ? "Ví đã mở popup — bấm xác nhận trong ví"
+            ? t.pay.stepPopup
             : undefined,
     },
     {
       key: "submit",
-      label: "Gửi lên mạng Cardano",
+      label: t.pay.stepSubmit,
       state: submitted ? "done" : stage === "submitting" ? "active" : "todo",
       detail: txHash ? (
         <a
@@ -619,28 +624,30 @@ function PaymentProgress({
     },
     {
       key: "block",
-      label: "Vào block",
+      label: t.pay.stepBlock,
       state: inBlock ? "done" : submitted ? "active" : "todo",
       detail:
         !inBlock && submitted
-          ? `Thường mất 20–60 giây${submittedAt ? ` · đã chờ ${Math.round((now - submittedAt) / 1000)}s` : ""}`
+          ? t.pay.stepBlockWait(
+              submittedAt ? t.pay.stepWaited(Math.round((now - submittedAt) / 1000)) : "",
+            )
           : undefined,
     },
     {
       key: "confirm",
-      label: `Đủ ${REQUIRED_CONFIRMATIONS} xác nhận`,
+      label: t.pay.stepConfirm(REQUIRED_CONFIRMATIONS),
       state: done ? "done" : order.status === "underpaid" ? "failed" : inBlock ? "active" : "todo",
       detail:
         order.status === "underpaid"
-          ? "Số tiền nhận được ít hơn yêu cầu"
+          ? t.pay.stepUnderpaid
           : inBlock && !done
-            ? `${confirmations}/${REQUIRED_CONFIRMATIONS} — mỗi block khoảng 20 giây`
+            ? t.pay.stepProgress(confirmations, REQUIRED_CONFIRMATIONS)
             : undefined,
     },
   ];
 
   return (
-    <Card title="Tiến trình thanh toán">
+    <Card title={t.pay.progressTitle}>
       <ol className="space-y-3">
         {steps.map((step) => (
           <li key={step.key} className="flex gap-3">
@@ -665,8 +672,8 @@ function PaymentProgress({
 
       {submitted && !done && order.status !== "underpaid" && (
         <p className="mt-4 border-t border-hairline pt-3 text-xs leading-relaxed text-fg-subtle">
-          Giao dịch đã nằm trên chain — <strong>bạn có thể đóng trang này</strong>. Đơn vẫn được
-          ghi nhận, và không cần trả lại lần nữa.
+          {t.pay.canClose1} <strong>{t.pay.canClose2}</strong>
+          {t.pay.canClose3}
         </p>
       )}
     </Card>
@@ -708,19 +715,25 @@ function StepMark({ state }: { state: StepState }) {
 }
 
 function StatusBadge({ status, confirmations }: { status: Order["status"]; confirmations: number }) {
+  const t = useDict();
+
   switch (status) {
     case "confirmed":
-      return <Badge tone="success">Đã thanh toán</Badge>;
+      return <Badge tone="success">{t.status.confirmed}</Badge>;
     case "seen":
-      return <Badge tone="info">Đang xác nhận · {confirmations}</Badge>;
+      return (
+        <Badge tone="info">
+          {t.status.seen} · {confirmations}
+        </Badge>
+      );
     case "underpaid":
-      return <Badge tone="warning">Nhận thiếu</Badge>;
+      return <Badge tone="warning">{t.status.underpaid}</Badge>;
     case "expired":
-      return <Badge tone="danger">Hết hạn</Badge>;
+      return <Badge tone="danger">{t.status.expired}</Badge>;
     case "failed":
-      return <Badge tone="danger">Thất bại</Badge>;
+      return <Badge tone="danger">{t.status.failed}</Badge>;
     default:
-      return <Badge>Chờ thanh toán</Badge>;
+      return <Badge>{t.status.pending}</Badge>;
   }
 }
 
@@ -731,6 +744,8 @@ function NetworkWarning({
   orderNetwork: string;
   walletNetworkId: number | undefined;
 }) {
+  const t = useDict();
+
   if (walletNetworkId === undefined) return null;
 
   const orderIsMainnet = orderNetwork === "mainnet";
@@ -740,8 +755,9 @@ function NetworkWarning({
   // Gửi nhầm mạng là mất tiền và không lấy lại được — chặn trước khi họ bấm ký.
   return (
     <Alert tone="danger">
-      Ví đang ở <strong>{walletIsMainnet ? "Mainnet" : "Testnet"}</strong> nhưng đơn này thuộc{" "}
-      <strong>{orderNetwork}</strong>. Đổi mạng trong ví trước khi trả — gửi nhầm mạng là mất tiền.
+      {t.pay.networkMismatch1} <strong>{walletIsMainnet ? "Mainnet" : "Testnet"}</strong>{" "}
+      {t.pay.networkMismatch2} <strong>{orderNetwork}</strong>
+      {t.pay.networkMismatch3}
     </Alert>
   );
 }
@@ -752,23 +768,22 @@ function NetworkWarning({
  * Hiện hướng dẫn cụ thể thay vì để một nút bấm không làm gì cả.
  */
 function NoWalletHelp({ orderRef }: { orderRef: string }) {
+  const t = useDict();
   const url = typeof window === "undefined" ? "" : `${window.location.origin}/pay/${orderRef}`;
 
   return (
     <div className="space-y-4">
-      <Alert tone="info">Không phát hiện ví Cardano nào trong trình duyệt này.</Alert>
+      <Alert tone="info">{t.pay.noWallet}</Alert>
       <div className="space-y-2 text-sm leading-relaxed text-fg-muted">
         <p>
-          <strong className="text-fg">Trên máy tính:</strong> cài extension Lace, Eternl,
-          Nami, Typhon… rồi tải lại trang.
+          <strong className="text-fg">{t.pay.noWalletDesktop}</strong> {t.pay.noWalletDesktopBody}
         </p>
         <p>
-          <strong className="text-fg">Trên điện thoại:</strong> mở link này trong{" "}
-          <em>dApp browser</em> của ví (Eternl, Vespr, Lace mobile). Trình duyệt thường không truy
-          cập được ví.
+          <strong className="text-fg">{t.pay.noWalletMobile}</strong> {t.pay.noWalletMobileBody1}{" "}
+          <em>{t.pay.noWalletMobileBody2}</em> {t.pay.noWalletMobileBody3}
         </p>
       </div>
-      {url && <CopyableField label="Link trang này" value={url} display={truncate(url, 28, 12)} />}
+      {url && <CopyableField label={t.pay.pageLink} value={url} display={truncate(url, 28, 12)} />}
     </div>
   );
 }

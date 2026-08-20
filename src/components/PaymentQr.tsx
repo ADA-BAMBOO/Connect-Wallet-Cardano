@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import qrcode from "qrcode-generator";
 
+import { useDict } from "@/lib/i18n/client";
+
 /**
  * Mã QR vẽ bằng SVG.
  *
@@ -30,6 +32,8 @@ export function PaymentQr({
   label?: string;
   className?: string;
 }) {
+  const t = useDict();
+
   const { path, size } = useMemo(() => {
     // 0 = tự chọn phiên bản theo độ dài dữ liệu. "M" = sửa lỗi ~15%, đủ để quét
     // được cả khi màn hình loá hoặc bản in hơi bẩn.
@@ -64,7 +68,7 @@ export function PaymentQr({
           height={188}
           shapeRendering="crispEdges"
           role="img"
-          aria-label={label ? `Mã QR: ${label}` : "Mã QR thanh toán"}
+          aria-label={label ? t.a11y.qrLabelled(label) : t.a11y.qrGeneric}
         >
           <rect width={size} height={size} fill="#ffffff" />
           <path d={path} fill="#000000" />

@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Ambient } from "@/components/Ambient";
+import { LocaleProvider } from "@/lib/i18n/client";
+import { getDictionary, getLocale } from "@/lib/i18n/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,11 +19,10 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Cardano Connect — Demo kết nối ví CIP-30",
-  description:
-    "Dự án mẫu kết nối ví hệ sinh thái Cardano: phát hiện ví, đọc số dư và NFT, đăng nhập bằng chữ ký, gửi giao dịch ADA.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getDictionary();
+  return { title: t.meta.homeTitle, description: t.meta.homeDescription };
+}
 
 /**
  * `themeColor` khớp với nền trang để thanh địa chỉ trên mobile không lệch tông.
@@ -33,7 +34,16 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+/**
+ * Ngôn ngữ đọc từ cookie, nên layout gốc là dynamic — mọi trang bên dưới cũng vậy.
+ * Đây là cái giá của việc chọn ngôn ngữ bằng cookie thay vì bằng đường dẫn; xem lý
+ * do ở lib/i18n/locales.ts. Trang duy nhất từng tĩnh là trang chủ, mà nội dung của
+ * nó vốn nằm trong một client component nạp với `ssr: false`.
+ */
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
+  const t = await getDictionary();
+
   return (
     /*
      * suppressHydrationWarning trên <html> và <body>:
@@ -51,7 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
      * các component. Đừng thêm nó vào component ứng dụng để "cho hết lỗi".
      */
     <html
-      lang="vi"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
@@ -66,11 +76,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             focus:rounded-lg focus:bg-leaf-500 focus:px-4 focus:py-2.5 focus:text-sm
             focus:font-medium focus:text-ink-950"
         >
-          Bỏ qua, tới nội dung chính
+          {t.a11y.skipToContent}
         </a>
 
         <Ambient />
-        {children}
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
       </body>
     </html>
   );

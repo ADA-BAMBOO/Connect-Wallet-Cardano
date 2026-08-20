@@ -7,6 +7,8 @@ import { Alert, Badge, Button, Card, Field, inputClass } from "./ui";
 import { describeError, readJsonResponse } from "@/lib/errors";
 import { truncate } from "@/lib/format";
 import { useNetworkId } from "@/lib/use-wallet-data";
+import { useDict } from "@/lib/i18n/client";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 /**
  * Thẻ faucet — người test tự lấy stablecoin thử.
@@ -46,20 +48,26 @@ type ClaimResult = {
   assets: { symbol: string; amount: string }[];
 };
 
-/** Cùng cách diễn đạt với `formatDuration` phía server, để hai bên không nói lệch nhau. */
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds} giây`;
+/**
+ * Cùng cách diễn đạt với `formatDuration` phía server, để hai bên không nói lệch nhau.
+ *
+ * Nhận cả từ điển thay vì gọi hook: hàm này chạy ngoài thân component (trong nhánh
+ * JSX và trong chuỗi ghép), mà hook thì không gọi được ở đó.
+ */
+function formatDuration(seconds: number, t: Dictionary): string {
+  if (seconds < 60) return t.faucet.seconds(seconds);
 
   const minutes = Math.ceil(seconds / 60);
-  if (minutes < 60) return `${minutes} phút`;
+  if (minutes < 60) return t.faucet.minutes(minutes);
 
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return rest === 0 ? `${hours} giờ` : `${hours} giờ ${rest} phút`;
+  return rest === 0 ? t.faucet.hours(hours) : t.faucet.hoursMinutes(hours, rest);
 }
 
 export function FaucetCard() {
   const { wallet, connected } = useWallet();
+  const t = useDict();
   const networkId = useNetworkId();
 
   const [status, setStatus] = useState<FaucetStatus | null>(null);
@@ -134,7 +142,7 @@ export function FaucetCard() {
       const data = await readJsonResponse<ClaimResult & { error?: string }>(res);
 
       if (!res.ok || "error" in data) {
-        setError(("error" in data && data.error) || `Xin thất bại (HTTP ${res.status}).`);
+        setError(("error" in data && data.error) || t.faucet.claimFailed(res.status));
         return;
       }
 
@@ -155,17 +163,17 @@ export function FaucetCard() {
 
   return (
     <Card
-      title="Faucet stablecoin thử"
-      description="Lấy token test để chạy thử luồng thanh toán — Preprod"
+      title={t.faucet.title}
+      description={t.faucet.description}
       icon={<DropIcon />}
       action={<Badge tone={status?.enabled ? "success" : "neutral"}>Preprod</Badge>}
     >
       <div className="space-y-4">
-        {statusError && <Alert tone="warning">Không đọc được trạng thái faucet: {statusError}</Alert>}
+        {statusError && <Alert tone="warning">{t.faucet.statusError(statusError)}</Alert>}
 
         {status && !status.enabled && (
           <Alert tone="info">
-            <div className="font-medium">Faucet chưa sẵn sàng</div>
+            <div className="font-medium">{t.faucet.notReady}</div>
             <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs leading-relaxed">
               {status.problems.map((problem) => (
                 <li key={problem}>{problem}</li>
@@ -176,15 +184,15 @@ export function FaucetCard() {
 
         {walletOnMainnet && (
           <Alert tone="warning">
-            Ví đang ở <strong>Mainnet</strong>. Faucet chỉ phát trên Preprod — chuyển ví sang Preprod
-            rồi lấy lại địa chỉ, hoặc dán một địa chỉ <code>addr_test1…</code> vào ô dưới.
+            {t.faucet.mainnetWarning1} <strong>Mainnet</strong>{t.faucet.mainnetWarning2}{" "}
+            <code>addr_test1…</code> {t.faucet.mainnetWarning3}
           </Alert>
         )}
 
         {status && status.tokens.length > 0 && (
           <div className="rounded-xl border border-hairline bg-ink-950/40 p-3.5">
             <div className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
-              Mỗi lượt nhận được
+              {t.faucet.perClaim}
             </div>
             <ul className="mt-2 space-y-1.5">
               {status.tokens.map((token) => (
@@ -196,7 +204,7 @@ export function FaucetCard() {
                   <span className="font-mono text-fg">
                     {token.amount}
                     {token.available === false && (
-                      <span className="ml-2 text-xs text-warn-400">hết</span>
+                      <span className="ml-2 text-xs text-warn-400">{t.faucet.outOfStock}</span>
                     )}
                   </span>
                 </li>
@@ -204,7 +212,7 @@ export function FaucetCard() {
               <li className="flex items-baseline justify-between gap-3 border-t border-hairline pt-1.5 text-sm">
                 {/* ADA không phải quà: output mang native token bắt buộc phải có min-ADA. */}
                 <span className="text-fg-muted">
-                  ADA<span className="ml-1.5 text-xs text-fg-subtle">min-ADA + phí</span>
+                  ADA<span className="ml-1.5 text-xs text-fg-subtle">{t.faucet.minAdaNote}</span>
                 </span>
                 <span className="font-mono text-fg">{status.ada}</span>
               </li>
@@ -213,13 +221,9 @@ export function FaucetCard() {
         )}
 
         <Field
-          label="Địa chỉ nhận"
-          hint={
-            connected
-              ? "Mặc định là ví đang kết nối. Sửa được nếu muốn nạp cho ví khác."
-              : "Địa chỉ Preprod, bắt đầu bằng addr_test1"
-          }
-          error={address.trim() && !addressLooksValid ? "Phải là địa chỉ Preprod (addr_test1…)." : undefined}
+          label={t.faucet.recipient}
+          hint={connected ? t.faucet.recipientHintConnected : t.faucet.recipientHintManual}
+          error={address.trim() && !addressLooksValid ? t.faucet.recipientInvalid : undefined}
         >
           <input
             className={inputClass}
@@ -236,7 +240,7 @@ export function FaucetCard() {
 
         {result && (
           <Alert tone="success">
-            <div className="font-medium">Đã gửi giao dịch phát token</div>
+            <div className="font-medium">{t.faucet.sent}</div>
             <div className="mt-1 text-xs">
               {result.assets.map((asset) => `${asset.amount} ${asset.symbol}`).join(" · ")} +{" "}
               {result.ada} ADA
@@ -248,29 +252,28 @@ export function FaucetCard() {
               rel="noreferrer"
               className="mt-2 inline-block underline underline-offset-4"
             >
-              Xem trên Cardanoscan ↗
+              {t.faucet.viewOnExplorer}
             </a>
             <p className="mt-2 text-xs opacity-80">
-              Token xuất hiện trong ví sau khoảng 20–60 giây, khi giao dịch vào block.
+              {t.faucet.arriveNote}
             </p>
           </Alert>
         )}
 
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={claim} disabled={disabled} loading={busy}>
-            {busy ? "Đang phát…" : "Nhận token thử"}
+            {busy ? t.faucet.claiming : t.faucet.claim}
           </Button>
 
           {cooldownLeft > 0 && (
             <span className="text-sm text-fg-muted">
-              Địa chỉ này xin lại được sau {formatDuration(cooldownLeft)}.
+              {t.faucet.cooldown(formatDuration(cooldownLeft, t))}
             </span>
           )}
         </div>
 
         <p className="text-xs leading-relaxed text-fg-subtle">
-          Token thử KHÔNG có giá trị: chúng do chính hệ thống này đúc trên Preprod, chỉ để chạy thử
-          luồng thanh toán. Cần ADA testnet cho phí giao dịch thì lấy thêm tại{" "}
+          {t.faucet.worthless}{" "}
           <a
             href="https://docs.cardano.org/cardano-testnets/tools/faucet/"
             target="_blank"
@@ -280,21 +283,23 @@ export function FaucetCard() {
             Cardano Testnet Faucet
           </a>
           .
-          {status?.cooldownSeconds ? ` Mỗi địa chỉ xin một lần mỗi ${formatDuration(status.cooldownSeconds)}.` : ""}
+          {status?.cooldownSeconds
+            ? t.faucet.cooldownNote(formatDuration(status.cooldownSeconds, t))
+            : ""}
         </p>
 
         {status?.address && (
           <p className="text-xs text-fg-subtle">
-            Ví faucet: <span className="font-mono">{truncate(status.address, 12, 8)}</span>
+            {t.faucet.faucetWallet} <span className="font-mono">{truncate(status.address, 12, 8)}</span>
             {status.balanceAda && (
               <>
-                {" · còn "}
+                {t.faucet.remaining}
                 <span className={status.balanceLow ? "text-warn-400" : ""}>
                   {status.balanceAda} ADA
                 </span>
               </>
             )}
-            {status.usage && ` · đã phát ${status.usage.last24h} lượt trong 24 giờ`}
+            {status.usage && t.faucet.usage(status.usage.last24h)}
           </p>
         )}
       </div>

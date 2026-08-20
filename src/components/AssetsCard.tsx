@@ -12,11 +12,13 @@ import {
 } from "@/lib/format";
 import { getNetworkInfo } from "@/lib/network";
 import { useAssets, useNetworkId } from "@/lib/use-wallet-data";
+import { useDict } from "@/lib/i18n/client";
 
 type AssetMeta = { unit: string; name?: string; images?: string[]; decimals?: number };
 
 export function AssetsCard() {
   const { connected } = useWallet();
+  const t = useDict();
   const assets = useAssets();
   const networkId = useNetworkId();
   const network = getNetworkInfo(networkId);
@@ -87,8 +89,8 @@ export function AssetsCard() {
 
   return (
     <Card
-      title="Token & NFT"
-      description="Native asset đang có trong ví"
+      title={t.assets.title}
+      description={t.assets.description}
       icon={<StackIcon />}
       action={
         assets === undefined ? (
@@ -100,11 +102,11 @@ export function AssetsCard() {
     >
       {assets === undefined ? (
         <div className="flex items-center gap-2 py-6 text-sm text-fg-muted">
-          <Spinner /> Đang đọc asset từ ví…
+          <Spinner /> {t.assets.reading}
         </div>
       ) : total === 0 ? (
         <p className="py-6 text-center text-sm text-fg-subtle">
-          Ví chưa có native token hay NFT nào ngoài ADA.
+          {t.assets.empty}
         </p>
       ) : (
         <div className="space-y-6">
@@ -233,14 +235,13 @@ export function AssetsCard() {
 
           {metaEnabled === false && (
             <Alert tone="info">
-              <div className="font-medium">Vì sao NFT không có hình ảnh?</div>
+              <div className="font-medium">{t.assets.whyNoImage}</div>
               <p className="mt-1 opacity-90">
-                Ví CIP-30 chỉ trả về <strong>mã asset và số lượng</strong> — trong ví không có
-                tên hay ảnh. Muốn có ảnh phải hỏi một chain indexer.
+                {t.assets.whyBody1} <strong>{t.assets.whyBody2}</strong> {t.assets.whyBody3}
               </p>
               <p className="mt-2 opacity-90">
-                Server chưa cấu hình <code className="font-mono">BLOCKFROST_API_KEY</code>, nên
-                app đang hiện placeholder sinh từ policy ID. Lấy key miễn phí tại{" "}
+                {t.assets.whyBody4} <code className="font-mono">BLOCKFROST_API_KEY</code>
+                {t.assets.whyBody5}{" "}
                 <a
                   href="https://blockfrost.io"
                   target="_blank"
@@ -249,13 +250,14 @@ export function AssetsCard() {
                 >
                   blockfrost.io
                 </a>
-                , thêm vào <code className="font-mono">.env.local</code> rồi khởi động lại server:
+                {t.assets.whyBody6} <code className="font-mono">.env.local</code>{" "}
+                {t.assets.whyBody7}
               </p>
               <pre className="mt-2 overflow-x-auto rounded-lg bg-ink-950/70 px-3 py-2 font-mono text-[11px]">
                 BLOCKFROST_API_KEY=preprod...
               </pre>
               <p className="mt-2 text-xs opacity-80">
-                Network suy ra từ prefix của key: <code className="font-mono">mainnet…</code> /{" "}
+                {t.assets.whyBody8} <code className="font-mono">mainnet…</code> /{" "}
                 <code className="font-mono">preprod…</code> /{" "}
                 <code className="font-mono">preview…</code>
               </p>

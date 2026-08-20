@@ -10,6 +10,8 @@ import { SendAdaCard } from "./SendAdaCard";
 import { CreateOrderCard } from "./CreateOrderCard";
 import { FaucetCard } from "./FaucetCard";
 import { WalletDiagnostics } from "./WalletDiagnostics";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useDict } from "@/lib/i18n/client";
 
 /**
  * Toàn bộ phần phụ thuộc vào ví nằm trong file này.
@@ -26,6 +28,7 @@ export default function WalletApp() {
 
 function Shell() {
   const { connected } = useWallet();
+  const t = useDict();
 
   return (
     <>
@@ -34,8 +37,8 @@ function Shell() {
           <div className="flex min-w-0 items-center gap-3">
             <CardanoMark />
             <div className="min-w-0 leading-tight">
-              <div className="truncate font-semibold text-fg">Cardano Connect</div>
-              <div className="truncate text-xs text-fg-subtle">Demo kết nối ví CIP-30</div>
+              <div className="truncate font-semibold text-fg">{t.shell.brand}</div>
+              <div className="truncate text-xs text-fg-subtle">{t.shell.tagline}</div>
             </div>
           </div>
 
@@ -49,8 +52,9 @@ function Shell() {
               className="hidden min-h-10 items-center rounded-lg px-3 text-sm font-medium text-fg-muted
                 transition-colors duration-150 hover:bg-white/[0.06] hover:text-fg sm:inline-flex"
             >
-              Sổ đơn hàng
+              {t.shell.orderBook}
             </Link>
+            <LanguageSwitcher />
             <ConnectWallet />
           </div>
         </div>
@@ -79,6 +83,7 @@ function Shell() {
 
 function Welcome() {
   const wallets = useWalletList();
+  const t = useDict();
 
   return (
     <div className="py-8 sm:py-12">
@@ -88,16 +93,16 @@ function Welcome() {
             px-3 py-1 text-xs font-medium text-brand-300"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-          Chuẩn CIP-30 · Mesh SDK
+          {t.welcome.badge}
         </span>
 
         <h1 className="mt-5 text-4xl font-semibold tracking-tight text-balance text-fg sm:text-5xl">
-          Kết nối ví Cardano<span className="text-leaf-500">.</span>
+          {t.welcome.headline}
+          <span className="text-leaf-500">.</span>
         </h1>
         {/* max-w giữ dòng ở khoảng 65–75 ký tự, đọc dễ hơn hẳn dòng dài hết khung */}
         <p className="mt-4 max-w-[60ch] text-lg leading-relaxed text-fg-muted">
-          Dự án mẫu đầy đủ: phát hiện ví, đọc số dư và tài sản, đăng nhập bằng chữ ký, và gửi giao
-          dịch ADA — xây trên chuẩn CIP-30 với Mesh SDK.
+          {t.welcome.intro}
         </p>
 
         <div className="mt-8">
@@ -109,8 +114,8 @@ function Welcome() {
               }`}
             />
             {wallets.length > 0
-              ? `Phát hiện ${wallets.length} ví: ${wallets.map((w) => w.name).join(", ")}`
-              : "Chưa phát hiện ví nào trong trình duyệt."}
+              ? t.welcome.walletsDetected(wallets.length, wallets.map((w) => w.name).join(", "))
+              : t.welcome.noWallets}
           </p>
         </div>
       </div>
@@ -118,40 +123,38 @@ function Welcome() {
       <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Feature
           icon={<PlugIcon />}
-          title="Phát hiện ví"
-          body="Liệt kê mọi ví CIP-30 đã cài, tự kết nối lại sau reload."
+          title={t.welcome.detectTitle}
+          body={t.welcome.detectBody}
         />
         <Feature
           icon={<CoinsIcon />}
-          title="Số dư & tài sản"
-          body="ADA, native token và NFT đọc trực tiếp từ UTxO của ví."
+          title={t.welcome.balanceTitle}
+          body={t.welcome.balanceBody}
         />
         <Feature
           icon={<ShieldIcon />}
-          title="Đăng nhập Web3"
-          body="Ký nonce bằng địa chỉ stake, server xác minh và cấp session."
+          title={t.welcome.loginTitle}
+          body={t.welcome.loginBody}
         />
         <Feature
           icon={<PaperPlaneIcon />}
-          title="Gửi giao dịch"
-          body="Dựng, ký và phát tx ADA kèm kiểm tra đúng mạng."
+          title={t.welcome.sendTitle}
+          body={t.welcome.sendBody}
         />
       </div>
 
       <div className="mt-12 overflow-hidden rounded-2xl border border-hairline bg-surface/80 p-6 backdrop-blur-sm">
-        <h2 className="font-semibold text-fg">Ví hoạt động như thế nào?</h2>
+        <h2 className="font-semibold text-fg">{t.welcome.howTitle}</h2>
         <p className="mt-2 max-w-[72ch] text-sm leading-relaxed text-fg-muted">
-          Extension ví inject một object vào{" "}
+          {t.welcome.howBody1}{" "}
           <code className="rounded bg-ink-950/60 px-1.5 py-0.5 font-mono text-brand-300">
             window.cardano
           </code>
-          . Trang web gọi{" "}
+          {t.welcome.howBody2}{" "}
           <code className="rounded bg-ink-950/60 px-1.5 py-0.5 font-mono text-brand-300">
             enable()
           </code>
-          , người dùng bấm đồng ý trong popup, và trang nhận được quyền <strong>đọc</strong> địa chỉ
-          cùng UTxO. Mọi thao tác ký đều phải được người dùng xác nhận thủ công trong ví — website
-          không bao giờ chạm được vào private key.
+          {t.welcome.howBody3}
         </p>
       </div>
     </div>

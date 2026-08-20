@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Alert, Badge, Button, Card, CopyableField, Field, inputClass } from "./ui";
 import { PaymentQr } from "./PaymentQr";
 import { useNetworkId } from "@/lib/use-wallet-data";
+import { useDict } from "@/lib/i18n/client";
 
 /**
  * Thẻ tạo đơn thanh toán, dành cho phía người bán.
@@ -25,6 +26,7 @@ type CreatedOrder = {
 type HealthNetwork = { network: string; enabled: boolean };
 
 export function CreateOrderCard() {
+  const t = useDict();
   const walletNetworkId = useNetworkId();
 
   const [networks, setNetworks] = useState<string[] | null>(null);
@@ -69,7 +71,7 @@ export function CreateOrderCard() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? `Tạo đơn thất bại (HTTP ${res.status}).`);
+        setError(data.error ?? t.createOrder.failed(res.status));
         return;
       }
 
@@ -85,13 +87,13 @@ export function CreateOrderCard() {
 
   if (networks !== null && networks.length === 0) {
     return (
-      <Card title="Tạo đơn thanh toán" icon={<InvoiceIcon />}>
+      <Card title={t.createOrder.title} icon={<InvoiceIcon />}>
         <Alert tone="info">
-          Chưa mạng nào sẵn sàng nhận thanh toán. Xem{" "}
+          {t.createOrder.noNetworks1}{" "}
           <a href="/api/payments/health" target="_blank" rel="noreferrer" className="underline underline-offset-4">
             /api/payments/health
           </a>{" "}
-          để biết còn thiếu cấu hình gì.
+          {t.createOrder.noNetworks2}
         </Alert>
       </Card>
     );
@@ -108,13 +110,13 @@ export function CreateOrderCard() {
 
   return (
     <Card
-      title="Tạo đơn thanh toán"
-      description="Đơn tính bằng USD, người trả chọn ADA hoặc stablecoin"
+      title={t.createOrder.title}
+      description={t.createOrder.description}
       icon={<InvoiceIcon />}
     >
       <div className="space-y-4">
         {networks && networks.length > 1 && (
-          <Field label="Mạng">
+          <Field label={t.createOrder.network}>
             <select
               className={inputClass}
               value={network}
@@ -132,12 +134,12 @@ export function CreateOrderCard() {
 
         {orderIsMainnet && (
           <Alert tone="danger">
-            Đơn trên <strong>Mainnet</strong> nhận tiền thật và giao dịch{" "}
-            <strong>không thể hoàn tác</strong>.
+            {t.createOrder.mainnetWarning1} <strong>Mainnet</strong> {t.createOrder.mainnetWarning2}{" "}
+            <strong>{t.createOrder.mainnetWarning3}</strong>.
           </Alert>
         )}
 
-        <Field label="Số tiền (USD)" hint="Tối đa 6 chữ số thập phân">
+        <Field label={t.createOrder.amount} hint={t.createOrder.amountHint}>
           <input
             className={inputClass}
             value={amount}
@@ -148,12 +150,12 @@ export function CreateOrderCard() {
           />
         </Field>
 
-        <Field label="Mô tả (tuỳ chọn)" hint="Hiện trên trang thanh toán">
+        <Field label={t.createOrder.descriptionLabel} hint={t.createOrder.descriptionHint}>
           <input
             className={inputClass}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Gói Pro 1 tháng"
+            placeholder={t.createOrder.descriptionPlaceholder}
             maxLength={200}
             disabled={busy}
           />
@@ -161,15 +163,14 @@ export function CreateOrderCard() {
 
         {walletMismatch && (
           <Alert tone="warning">
-            Ví đang ở <strong>{walletNetwork}</strong> nhưng đơn thuộc{" "}
-            <strong>{network}</strong>. Vẫn tạo được đơn, nhưng ví này không trả thử được.
+            {t.createOrder.mismatch(walletNetwork ?? "", network)}
           </Alert>
         )}
 
         {error && <Alert tone="danger">{error}</Alert>}
 
         <Button onClick={create} disabled={busy || !amount.trim() || !network} loading={busy}>
-          {busy ? "Đang tạo…" : "Tạo đơn"}
+          {busy ? t.createOrder.creating : t.createOrder.create}
         </Button>
 
         {order && payUrl && (
@@ -177,7 +178,7 @@ export function CreateOrderCard() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-medium text-brand-200">
-                  Đã tạo đơn <span className="font-mono">{order.ref}</span>
+                  {t.createOrder.created(order.ref)}
                 </div>
                 <div className="mt-0.5 text-sm text-fg-muted">
                   {order.amountUsd} USD
@@ -193,7 +194,7 @@ export function CreateOrderCard() {
                 mô tả được số ADA, không mô tả được stablecoin. Quét bằng điện thoại
                 rồi mở trong dApp browser của ví là đường duy nhất chạy được cho token.
               */}
-              <PaymentQr value={payUrl} label="Quét để mở trang trả tiền" />
+              <PaymentQr value={payUrl} label={t.createOrder.qrLabel} />
 
               <div className="min-w-0 flex-1 space-y-3">
                 {/*
@@ -202,15 +203,13 @@ export function CreateOrderCard() {
                   link chữ nhỏ, nên nhìn vào không thấy đường đi tiếp.
                 */}
                 <a href={`/pay/${order.ref}`} target="_blank" rel="noreferrer">
-                  <Button className="w-full sm:w-auto">Mở trang thanh toán ↗</Button>
+                  <Button className="w-full sm:w-auto">{t.createOrder.openPayPage}</Button>
                 </a>
 
-                <CopyableField label="Link thanh toán" value={payUrl} href={`/pay/${order.ref}`} />
+                <CopyableField label={t.createOrder.payLink} value={payUrl} href={`/pay/${order.ref}`} />
 
                 <p className="text-xs leading-relaxed text-fg-subtle">
-                  Tự trả thử thì bấm nút trên. Muốn người khác trả thì gửi link này hoặc để
-                  họ quét mã QR. Đơn hết hạn lúc{" "}
-                  {new Date(order.expiresAt).toLocaleString("vi-VN")}.
+                  {t.createOrder.howTo(new Date(order.expiresAt).toLocaleString(t.dateLocale))}
                 </p>
               </div>
             </div>

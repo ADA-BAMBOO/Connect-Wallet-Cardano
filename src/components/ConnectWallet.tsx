@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWallet, useWalletList } from "@meshsdk/react";
 import { Badge, Button, Modal, Spinner } from "./ui";
 import { describeError } from "@/lib/errors";
+import { useDict } from "@/lib/i18n/client";
 
 const STORAGE_KEY = "cardano-demo:last-wallet";
 
@@ -16,6 +17,7 @@ const SUGGESTED_WALLETS = [
 ];
 
 export function ConnectWallet() {
+  const t = useDict();
   const wallets = useWalletList();
   const { connect, disconnect, connected, connecting, name, error } = useWallet();
   const [open, setOpen] = useState(false);
@@ -62,7 +64,7 @@ export function ConnectWallet() {
       <div className="flex items-center gap-3">
         <Badge tone="success">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-          Đã kết nối
+          {t.connect.connected}
         </Badge>
         <div className="flex min-h-10 items-center gap-2 rounded-lg border border-hairline bg-surface-2 px-3 py-1.5">
           {current?.icon && (
@@ -72,7 +74,7 @@ export function ConnectWallet() {
           <span className="text-sm font-medium capitalize text-fg">{name}</span>
         </div>
         <Button variant="secondary" size="sm" onClick={handleDisconnect}>
-          Ngắt kết nối
+          {t.connect.disconnect}
         </Button>
       </div>
     );
@@ -81,21 +83,21 @@ export function ConnectWallet() {
   return (
     <>
       <Button onClick={() => setOpen(true)} loading={connecting}>
-        {connecting ? "Đang kết nối…" : "Kết nối ví"}
+        {connecting ? t.connect.connecting : t.connect.connect}
       </Button>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Chọn ví"
+        title={t.connect.chooseWallet}
         description={
           wallets.length > 0
-            ? `Tìm thấy ${wallets.length} ví trong trình duyệt`
-            : "Chưa phát hiện ví nào"
+            ? t.connect.walletsFound(wallets.length)
+            : t.connect.noWalletDetected
         }
         footer={
           <p className="text-xs text-fg-subtle">
-            Ví được phát hiện qua chuẩn{" "}
+            {t.connect.detectedVia}{" "}
             <a
               href="https://cips.cardano.org/cip/CIP-30"
               target="_blank"
@@ -104,8 +106,7 @@ export function ConnectWallet() {
             >
               CIP-30
             </a>{" "}
-            (<code className="font-mono">window.cardano</code>). Trang này không bao giờ đọc được
-            private key của bạn.
+            (<code className="font-mono">window.cardano</code>). {t.connect.neverReadsKey}
           </p>
         }
       >
@@ -142,8 +143,7 @@ export function ConnectWallet() {
           ) : (
             <div className="px-2 py-3">
               <p className="text-sm text-fg-muted">
-                Trình duyệt chưa cài extension ví Cardano nào. Cài một trong các ví sau rồi tải lại
-                trang:
+                {t.connect.installPrompt}
               </p>
               <ul className="mt-3 grid grid-cols-2 gap-2">
                 {SUGGESTED_WALLETS.map((w) => (
@@ -166,7 +166,7 @@ export function ConnectWallet() {
 
           {error != null && (
             <p className="mt-2 px-2 pb-1 text-sm text-danger-400">
-              Không kết nối được: {describeError(error)}
+              {t.connect.connectFailed(describeError(error))}
             </p>
           )}
         </div>

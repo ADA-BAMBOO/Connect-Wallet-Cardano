@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateNonce } from "@meshsdk/core";
 import { isValidLoginAddress, saveNonce } from "@/lib/auth-server";
+import { getDictionary } from "@/lib/i18n/server";
 
 // checkSignature/generateNonce của Mesh cần Node runtime (WASM + node:crypto).
 export const runtime = "nodejs";
@@ -37,17 +38,18 @@ const LABEL = "Login ";
 const RANDOM_LENGTH = 24; // 6 + 24 = 30 byte
 
 export async function POST(request: Request) {
+  const t = await getDictionary();
   let address: unknown;
 
   try {
     ({ address } = await request.json());
   } catch {
-    return NextResponse.json({ error: "Body không phải JSON hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.badJson }, { status: 400 });
   }
 
   if (!isValidLoginAddress(address)) {
     return NextResponse.json(
-      { error: "Địa chỉ không hợp lệ (cần stake… hoặc addr…)." },
+      { error: t.api.invalidLoginAddress },
       { status: 400 },
     );
   }
@@ -63,9 +65,7 @@ export async function POST(request: Request) {
   if (payload.length > MAX_PAYLOAD_BYTES) {
     return NextResponse.json(
       {
-        error:
-          `Cấu hình sai: payload ${payload.length} byte vượt ngưỡng an toàn ` +
-          `${MAX_PAYLOAD_BYTES} byte cho ví cứng. Rút ngắn LABEL hoặc RANDOM_LENGTH.`,
+        error: t.api.payloadTooLong(payload.length, MAX_PAYLOAD_BYTES),
       },
       { status: 500 },
     );
@@ -76,9 +76,7 @@ export async function POST(request: Request) {
   if (!isPrintableAscii) {
     return NextResponse.json(
       {
-        error:
-          "Cấu hình sai: LABEL chứa ký tự ngoài ASCII in được (vd dấu tiếng Việt). " +
-          "Ví cứng sẽ phải hiển thị dạng hex và ngưỡng độ dài bị siết lại.",
+        error: t.api.payloadNotAscii,
       },
       { status: 500 },
     );

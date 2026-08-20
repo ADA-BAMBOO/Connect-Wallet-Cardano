@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import type { ComponentProps } from "react";
 import { Spinner } from "./ui";
+import { useDict } from "@/lib/i18n/client";
 
 /**
  * Nạp trang thanh toán với `ssr: false`, cùng lý do như WalletAppLoader: Mesh SDK
@@ -13,15 +14,22 @@ import { Spinner } from "./ui";
  */
 const PayApp = dynamic(() => import("./PayApp"), {
   ssr: false,
-  loading: () => (
+  loading: () => <Loading />,
+});
+
+/** Xem WalletAppLoader: hook không gọi được trong `loading` viết thẳng JSX. */
+function Loading() {
+  const t = useDict();
+
+  return (
     <div className="flex flex-1 items-center justify-center py-32">
       <div className="flex items-center gap-3 text-fg-muted">
         <Spinner className="text-brand-400" />
-        <span className="text-sm">Đang tải trang thanh toán…</span>
+        <span className="text-sm">{t.shell.loadingPay}</span>
       </div>
     </div>
-  ),
-});
+  );
+}
 
 export function PayAppLoader({
   orderRef,

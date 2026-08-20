@@ -7,12 +7,14 @@ import { adaToLovelace, lovelaceToAda, truncate } from "@/lib/format";
 import { addressMatchesNetwork, getNetworkInfo, txUrl } from "@/lib/network";
 import { describeError, isUserDeclined } from "@/lib/errors";
 import { useLovelace, useNetworkId } from "@/lib/use-wallet-data";
+import { useDict } from "@/lib/i18n/client";
 
 /** Cardano yêu cầu mỗi UTxO phải chứa tối thiểu ~1 ADA (min-ADA / minUTxOValue). */
 const MIN_LOVELACE = 1_000_000n;
 
 export function SendAdaCard() {
   const { wallet, connected } = useWallet();
+  const t = useDict();
   const balance = useLovelace();
   const networkId = useNetworkId();
   const network = getNetworkInfo(networkId);
@@ -26,18 +28,18 @@ export function SendAdaCard() {
   function validate(): string | null {
     const address = recipient.trim();
 
-    if (!address) return "Nhập địa chỉ người nhận.";
-    if (!address.startsWith("addr")) return "Địa chỉ phải bắt đầu bằng addr1 hoặc addr_test1.";
+    if (!address) return t.send.errNoRecipient;
+    if (!address.startsWith("addr")) return t.send.errBadPrefix;
     if (network && !addressMatchesNetwork(address, network)) {
       return network.isMainnet
-        ? "Ví đang ở Mainnet nhưng địa chỉ nhận là testnet (addr_test1)."
-        : "Ví đang ở Testnet nhưng địa chỉ nhận là mainnet (addr1). Gửi nhầm mạng sẽ mất tiền.";
+        ? t.send.errMainnetToTestnet
+        : t.send.errTestnetToMainnet;
     }
 
     const lovelace = adaToLovelace(amount);
-    if (lovelace === null) return "Số ADA không hợp lệ (tối đa 6 chữ số thập phân).";
-    if (BigInt(lovelace) < MIN_LOVELACE) return "Cardano yêu cầu gửi tối thiểu 1 ADA mỗi output.";
-    if (balance && BigInt(lovelace) > BigInt(balance)) return "Số dư không đủ.";
+    if (lovelace === null) return t.send.errBadAmount;
+    if (BigInt(lovelace) < MIN_LOVELACE) return t.send.errBelowMin;
+    if (balance && BigInt(lovelace) > BigInt(balance)) return t.send.errInsufficient;
 
     return null;
   }
@@ -60,7 +62,7 @@ export function SendAdaCard() {
       const { Transaction } = await import("@meshsdk/core");
 
       const lovelace = adaToLovelace(amount);
-      if (!lovelace) throw new Error("Số ADA không hợp lệ.");
+      if (!lovelace) throw new Error(t.send.errBadAmountShort);
 
       // 1. Dựng giao dịch — Mesh tự chọn UTxO, tính phí và trả tiền thừa về ví.
       const tx = new Transaction({ initiator: wallet });
@@ -80,8 +82,8 @@ export function SendAdaCard() {
       // Ví ném object CIP-30 `{code, info}`, không phải Error — xem lib/errors.ts.
       setError(
         isUserDeclined(err, "tx")
-          ? "Bạn đã huỷ ký giao dịch."
-          : `Giao dịch thất bại: ${describeError(err)}`,
+          ? t.send.errDeclined
+          : t.send.errFailed(describeError(err)),
       );
     } finally {
       setBusy(false);
@@ -92,24 +94,24 @@ export function SendAdaCard() {
 
   return (
     <Card
-      title="Gửi ADA"
-      description="Dựng, ký và phát giao dịch lên mạng Cardano"
+      title={t.send.title}
+      description={t.send.description}
       icon={<SendIcon />}
     >
       <div className="space-y-4">
         {network?.isMainnet && (
           <Alert tone="danger">
-            Ví đang ở <strong>Mainnet</strong>. Giao dịch gửi đi là <strong>không thể hoàn tác</strong>
-            {" "}và dùng ADA thật.
+            {t.send.mainnetWarning1} <strong>Mainnet</strong>{t.send.mainnetWarning2}{" "}
+            <strong>{t.send.mainnetWarning3}</strong> {t.send.mainnetWarning4}
           </Alert>
         )}
 
         <Field
-          label="Địa chỉ người nhận"
+          label={t.send.recipient}
           hint={
             network
-              ? `Phải là địa chỉ ${network.addressPrefix}… trên ${network.label}`
-              : "Địa chỉ bech32 bắt đầu bằng addr1 / addr_test1"
+              ? t.send.recipientHint(network.addressPrefix, network.label)
+              : t.send.recipientHintGeneric
           }
         >
           <input
@@ -124,12 +126,8 @@ export function SendAdaCard() {
         </Field>
 
         <Field
-          label="Số lượng (ADA)"
-          hint={
-            balance
-              ? `Khả dụng: ${lovelaceToAda(balance, 2)} ADA · tối thiểu 1 ADA`
-              : "Tối thiểu 1 ADA"
-          }
+          label={t.send.amount}
+          hint={balance ? t.send.amountHint(lovelaceToAda(balance, 2)) : t.send.amountHintGeneric}
         >
           <input
             className={inputClass}
@@ -145,7 +143,7 @@ export function SendAdaCard() {
 
         {txHash && (
           <Alert tone="success">
-            <div className="font-medium">Đã gửi giao dịch thành công</div>
+            <div className="font-medium">{t.send.sent}</div>
             <div className="mt-1 font-mono text-xs break-all">{truncate(txHash, 20, 12)}</div>
             {network && (
               <a
@@ -154,21 +152,21 @@ export function SendAdaCard() {
                 rel="noreferrer"
                 className="mt-2 inline-block underline underline-offset-4"
               >
-                Xem trên Cardanoscan ↗
+                {t.send.viewOnExplorer}
               </a>
             )}
             <p className="mt-2 text-xs opacity-80">
-              Giao dịch cần khoảng 20–60 giây để được đưa vào block.
+              {t.send.blockWait}
             </p>
           </Alert>
         )}
 
         <Button onClick={send} disabled={disabled} loading={busy}>
-          {busy ? "Đang xử lý…" : "Gửi giao dịch"}
+          {busy ? t.send.submitting : t.send.submit}
         </Button>
 
         <p className="text-xs leading-relaxed text-fg-subtle">
-          Cần ADA testnet? Lấy miễn phí tại{" "}
+          {t.send.needTestAda}{" "}
           <a
             href="https://docs.cardano.org/cardano-testnets/tools/faucet/"
             target="_blank"

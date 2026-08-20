@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type ButtonHTMLAttributes } from "react";
 import { createPortal } from "react-dom";
 
+import { useDict } from "@/lib/i18n/client";
+
 /*
  * Bộ primitive dùng chung.
  *
@@ -83,6 +85,7 @@ export function Modal({
   children: ReactNode;
   labelledBy?: string;
 }) {
+  const t = useDict();
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Đóng bằng Esc + khoá cuộn nền để không cuộn trang phía sau popup.
@@ -144,7 +147,7 @@ export function Modal({
             onClick={onClose}
             className="-mr-2 -mt-1 shrink-0 cursor-pointer rounded-lg p-2.5 text-fg-muted transition-colors
               duration-150 hover:bg-white/10 hover:text-fg"
-            aria-label="Đóng"
+            aria-label={t.a11y.close}
           >
             <svg
               className="h-5 w-5"
@@ -281,6 +284,7 @@ export function CopyableField({
   display?: string;
   href?: string;
 }) {
+  const t = useDict();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -316,7 +320,7 @@ export function CopyableField({
           onClick={copy}
           className="shrink-0 cursor-pointer rounded-md p-2 text-fg-subtle transition-colors duration-150
             hover:bg-white/10 hover:text-fg"
-          aria-label={`Sao chép ${label}`}
+          aria-label={t.a11y.copy(label)}
         >
           {copied ? (
             <svg className="h-4 w-4 text-brand-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -342,7 +346,7 @@ export function CopyableField({
         </button>
         {/* Xác nhận copy phải đọc được bằng screen reader, không chỉ đổi icon. */}
         <span aria-live="polite" className="sr-only">
-          {copied ? `Đã sao chép ${label}` : ""}
+          {copied ? t.a11y.copied(label) : ""}
         </span>
       </div>
     </div>
@@ -419,6 +423,7 @@ export function Field({
   required?: boolean;
   children: ReactNode;
 }) {
+  const t = useDict();
   const messageId = useId();
 
   return (
@@ -426,7 +431,7 @@ export function Field({
       <span className="text-sm font-medium text-fg">
         {label}
         {required && (
-          <span className="ml-1 text-danger-400" aria-label="bắt buộc">
+          <span className="ml-1 text-danger-400" aria-label={t.a11y.required}>
             *
           </span>
         )}

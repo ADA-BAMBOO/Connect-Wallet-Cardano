@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveImageCandidates, resolveLogoCandidates } from "@/lib/nft";
+import { getDictionary } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,7 @@ function resolveBlockfrostBase(key: string): string | null {
 // xem scripts/verify-nft-image.mjs cho các dạng dữ liệu thật trên chain.
 
 export async function POST(request: Request) {
+  const t = await getDictionary();
   const key = process.env.BLOCKFROST_API_KEY;
   const base = key ? resolveBlockfrostBase(key) : null;
 
@@ -43,11 +45,11 @@ export async function POST(request: Request) {
   try {
     ({ units } = await request.json());
   } catch {
-    return NextResponse.json({ error: "Body không phải JSON hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.badJson }, { status: 400 });
   }
 
   if (!Array.isArray(units)) {
-    return NextResponse.json({ error: "Thiếu mảng `units`." }, { status: 400 });
+    return NextResponse.json({ error: t.api.missingUnits }, { status: 400 });
   }
 
   // Chặn số lượng để không đốt rate limit của Blockfrost.

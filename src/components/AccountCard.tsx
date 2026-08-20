@@ -6,9 +6,11 @@ import { Alert, Badge, Card, CopyableField, Spinner } from "./ui";
 import { addressUrl, getNetworkInfo } from "@/lib/network";
 import { lovelaceToAda, truncate } from "@/lib/format";
 import { useLovelace, useNetworkId, useWalletAddress } from "@/lib/use-wallet-data";
+import { useDict } from "@/lib/i18n/client";
 
 export function AccountCard() {
   const { wallet, connected } = useWallet();
+  const t = useDict();
   const address = useWalletAddress();
   const lovelace = useLovelace();
   const networkId = useNetworkId();
@@ -46,8 +48,8 @@ export function AccountCard() {
 
   return (
     <Card
-      title="Tài khoản"
-      description="Dữ liệu đọc trực tiếp từ ví qua CIP-30"
+      title={t.account.title}
+      description={t.account.description}
       icon={<WalletIcon />}
       action={
         network ? (
@@ -60,15 +62,14 @@ export function AccountCard() {
             {network.label}
           </Badge>
         ) : (
-          <Badge>Đang đọc mạng…</Badge>
+          <Badge>{t.account.readingNetwork}</Badge>
         )
       }
     >
       <div className="space-y-5">
         {network?.isMainnet && (
           <Alert tone="warning">
-            Ví đang ở <strong>Mainnet</strong> — mọi giao dịch dùng ADA thật. Để thử nghiệm an
-            toàn, hãy chuyển ví sang Preprod/Preview testnet.
+            {t.account.mainnetWarning1} <strong>Mainnet</strong> {t.account.mainnetWarning2}
           </Alert>
         )}
 
@@ -80,7 +81,7 @@ export function AccountCard() {
           className="rounded-2xl border border-brand-500/25 bg-gradient-to-br from-brand-500/15 via-brand-500/5
             to-transparent px-5 py-4"
         >
-          <div className="text-xs font-medium uppercase tracking-wide text-fg-muted">Số dư</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-fg-muted">{t.account.balance}</div>
           <div className="mt-1 flex items-baseline gap-2">
             {lovelace === undefined ? (
               <Spinner className="text-fg-subtle" />
@@ -96,28 +97,27 @@ export function AccountCard() {
           {lovelace !== undefined && (
             <div className="mt-1 font-mono text-xs tabular-nums text-fg-subtle">
               {BigInt(lovelace).toLocaleString("en-US")} lovelace
-              {utxoCount !== null && ` · ${utxoCount} UTxO`}
+              {utxoCount !== null && t.account.utxoCount(utxoCount)}
             </div>
           )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <CopyableField
-            label="Địa chỉ nhận (payment)"
+            label={t.account.paymentAddress}
             value={address ?? ""}
             display={truncate(address, 14, 8)}
             href={address && network ? addressUrl(network, address) : undefined}
           />
           <CopyableField
-            label="Địa chỉ stake"
+            label={t.account.stakeAddress}
             value={stakeAddress ?? ""}
             display={stakeAddress ? truncate(stakeAddress, 14, 8) : "—"}
           />
         </div>
 
         <p className="text-xs leading-relaxed text-fg-subtle">
-          Địa chỉ payment có thể đổi theo từng giao dịch, nên <strong>địa chỉ stake</strong> mới là
-          định danh ổn định của một ví — đó là lý do phần đăng nhập bên dưới ký bằng địa chỉ stake.
+          {t.account.stakeNote1} <strong>{t.account.stakeNote2}</strong> {t.account.stakeNote3}
         </p>
       </div>
     </Card>

@@ -4,6 +4,7 @@ import { getOrderByRef, serializeOrder } from "@/lib/orders";
 import { checkRateLimit, guardRequest } from "@/lib/rate-limit";
 import { isValidRef } from "@/lib/ref";
 import { checkOrderAgainstTx, rememberCandidateTx } from "@/lib/watcher";
+import { getDictionary } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,10 +37,11 @@ const SUBMIT_PER_CLIENT = 60;
  * thử xem một thiết kế thanh toán có chắc hay không.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/payments/orders/[ref]/submit">) {
+  const t = await getDictionary();
   const { ref } = await ctx.params;
 
   if (!isValidRef(ref)) {
-    return NextResponse.json({ error: "Mã đơn không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.invalidRef }, { status: 400 });
   }
 
   // Chặn trước khi chạm tới Blockfrost hay Postgres — đó mới là thứ cần bảo vệ.
@@ -61,23 +63,23 @@ export async function POST(request: Request, ctx: RouteContext<"/api/payments/or
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Body không phải JSON hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.badJson }, { status: 400 });
   }
 
   const { txHash } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof txHash !== "string" || !/^[0-9a-f]{64}$/.test(txHash.trim())) {
     return NextResponse.json(
-      { error: "txHash phải là 64 ký tự hex thường." },
+      { error: t.api.invalidTxHash },
       { status: 400 },
     );
   }
 
   const order = await getOrderByRef(ref);
-  if (!order) return NextResponse.json({ error: "Không tìm thấy đơn hàng." }, { status: 404 });
+  if (!order) return NextResponse.json({ error: t.api.orderNotFound }, { status: 404 });
 
   if (order.payUnit === null) {
-    return NextResponse.json({ error: "Đơn chưa chọn token thanh toán." }, { status: 409 });
+    return NextResponse.json({ error: t.api.noTokenChosen }, { status: 409 });
   }
 
   const { verdict, order: updated } = await checkOrderAgainstTx(order, txHash.trim());

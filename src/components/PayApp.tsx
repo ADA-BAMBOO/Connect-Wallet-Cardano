@@ -4,6 +4,8 @@ import { MeshProvider } from "@meshsdk/react";
 import Link from "next/link";
 
 import { PayOrderCard, type OrderView } from "./PayOrderCard";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useDict } from "@/lib/i18n/client";
 
 /**
  * Vỏ của trang thanh toán.
@@ -15,10 +17,12 @@ import { PayOrderCard, type OrderView } from "./PayOrderCard";
  * duyệt, và Mesh SDK kéo theo WebAssembly.
  */
 export default function PayApp({ orderRef, initial }: { orderRef: string; initial: OrderView }) {
+  const t = useDict();
+
   return (
     <MeshProvider>
       <header className="border-b border-hairline bg-canvas/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-6 py-3.5">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-6 py-3.5">
           <Link
             href="/"
             className="flex min-h-11 items-center gap-3 rounded-lg pr-2 text-fg-muted
@@ -38,8 +42,9 @@ export default function PayApp({ orderRef, initial }: { orderRef: string; initia
                 <circle cx="18.6" cy="15.8" r="1.5" />
               </svg>
             </div>
-            <span className="text-sm font-medium">Cardano Connect</span>
+            <span className="text-sm font-medium">{t.shell.brand}</span>
           </Link>
+          <LanguageSwitcher />
         </div>
       </header>
 

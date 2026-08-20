@@ -6,6 +6,8 @@ import { formatAmount, USD_DECIMALS } from "@/lib/money";
 import { cardanoTxUrl, type CardanoNetwork, isCardanoNetwork } from "@/lib/network";
 import { getOrderStats, listOrders, type OrderStatus } from "@/lib/orders";
 import { truncate } from "@/lib/format";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { getDictionary } from "@/lib/i18n/server";
 
 /**
  * Sổ đơn hàng — trang đối soát cho người bán.
@@ -16,43 +18,40 @@ import { truncate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Sổ đơn hàng — Cardano Connect",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata() {
+  const t = await getDictionary();
+  return { title: t.meta.ordersTitle, robots: { index: false, follow: false } };
+}
 
 /*
  * `seen` và `confirmed` đều là xanh lá thương hiệu nên phải khác nhau ở chỗ khác
  * ngoài màu: `dot` cho sắc độ chấm, và nhãn chữ vẫn là thứ đọc được đầu tiên.
+ *
+ * Chỉ còn giữ MÀU. Nhãn nằm ở `t.status[...]` vì nó phải đổi theo ngôn ngữ, mà bảng
+ * này là hằng số ở module scope — không đọc được cookie của request.
  */
-const STATUS_STYLE: Record<OrderStatus, { label: string; className: string; dot: string }> = {
+const STATUS_STYLE: Record<OrderStatus, { className: string; dot: string }> = {
   pending: {
-    label: "Chờ thanh toán",
     className: "bg-white/[0.06] text-fg-muted border-hairline",
     dot: "bg-fg-subtle",
   },
   seen: {
-    label: "Đang xác nhận",
     className: "bg-leaf-500/12 text-leaf-300 border-leaf-500/30",
     dot: "bg-leaf-400 motion-safe:animate-pulse",
   },
   confirmed: {
-    label: "Đã thanh toán",
     className: "bg-brand-500/15 text-brand-300 border-brand-500/35",
     dot: "bg-brand-400",
   },
   underpaid: {
-    label: "Nhận thiếu",
     className: "bg-warn-500/15 text-warn-400 border-warn-500/35",
     dot: "bg-warn-400",
   },
   expired: {
-    label: "Hết hạn",
     className: "bg-white/[0.04] text-fg-subtle border-hairline",
     dot: "bg-fg-subtle/60",
   },
   failed: {
-    label: "Thất bại",
     className: "bg-danger-500/15 text-danger-400 border-danger-500/35",
     dot: "bg-danger-400",
   },
@@ -63,6 +62,7 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<{ network?: string; limit?: string }>;
 }) {
+  const t = await getDictionary();
   const admin = await checkAdmin();
 
   if (!admin.ok) {
@@ -90,7 +90,7 @@ export default async function OrdersPage({
             </svg>
           </div>
 
-          <h1 className="mt-5 text-xl font-semibold text-fg">Sổ đơn hàng bị khoá</h1>
+          <h1 className="mt-5 text-xl font-semibold text-fg">{t.orders.lockedTitle}</h1>
           <p className="mt-2 text-sm leading-relaxed text-fg-muted">{admin.error}</p>
 
           {admin.status === 401 && (
@@ -100,7 +100,7 @@ export default async function OrdersPage({
                 bg-leaf-500 px-4 text-sm font-medium text-ink-950 transition-colors duration-150
                 hover:bg-leaf-400"
             >
-              Đăng nhập bằng ví ở trang chủ
+              {t.orders.loginAtHome}
             </Link>
           )}
         </div>
@@ -123,9 +123,12 @@ export default async function OrdersPage({
     <Shell>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">Sổ đơn hàng</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">{t.orders.title}</h1>
           <p className="mt-1 text-sm text-fg-muted">
-            {network ? `Mạng ${network}` : "Tất cả các mạng"} · {stats.total} đơn
+            {t.orders.subtitle(
+              network ? t.orders.networkScope(network) : t.orders.allNetworks,
+              stats.total,
+            )}
           </p>
         </div>
         <OrdersRefresher />
@@ -151,26 +154,34 @@ export default async function OrdersPage({
             <path d="M12 8v5M12 16.5v.01M10.3 3.9 2.6 17.1A2 2 0 0 0 4.3 20h15.4a2 2 0 0 0 1.7-2.9L13.7 3.9a2 2 0 0 0-3.4 0Z" />
           </svg>
           <div>
-          Trang này đang <strong>mở</strong> vì chưa cấu hình{" "}
-          <code className="font-mono">PAYMENT_ADMIN_ADDRESSES</code>. Ở production nó sẽ tự khoá,
-          nhưng hãy đặt biến đó trước khi deploy.
+          {t.orders.openWarning1} <strong>{t.orders.openWarning2}</strong> {t.orders.openWarning3}{" "}
+          <code className="font-mono">PAYMENT_ADMIN_ADDRESSES</code>
+          {t.orders.openWarning4}
           </div>
         </div>
       )}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Stat label="Đã thu" value={`${formatAmount(stats.confirmedUsd, USD_DECIMALS)} USD`} tone="brand" />
-        <Stat label="Đang chờ" value={`${formatAmount(stats.pendingUsd, USD_DECIMALS)} USD`} tone="leaf" />
         <Stat
-          label="Cần xử lý tay"
-          value={`${stats.byStatus.underpaid ?? 0} đơn nhận thiếu`}
+          label={t.orders.statCollected}
+          value={`${formatAmount(stats.confirmedUsd, USD_DECIMALS)} USD`}
+          tone="brand"
+        />
+        <Stat
+          label={t.orders.statPending}
+          value={`${formatAmount(stats.pendingUsd, USD_DECIMALS)} USD`}
+          tone="leaf"
+        />
+        <Stat
+          label={t.orders.statManual}
+          value={t.orders.statManualValue(stats.byStatus.underpaid ?? 0)}
           tone={stats.byStatus.underpaid ? "warn" : "muted"}
         />
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
         <FilterLink href="/orders" active={!network}>
-          Tất cả
+          {t.orders.filterAll}
         </FilterLink>
         {(["mainnet", "preprod", "preview"] as const).map((item) => (
           <FilterLink key={item} href={`/orders?network=${item}`} active={network === item}>
@@ -181,9 +192,9 @@ export default async function OrdersPage({
 
       {orders.length === 0 ? (
         <div className="rounded-2xl border border-hairline bg-surface/70 px-4 py-14 text-center text-sm text-fg-subtle">
-          Chưa có đơn nào. Tạo đơn ở{" "}
+          {t.orders.empty1}{" "}
           <Link href="/" className="text-brand-300 underline underline-offset-4">
-            trang chủ
+            {t.orders.empty2}
           </Link>
           .
         </div>
@@ -193,12 +204,12 @@ export default async function OrdersPage({
           <table className="w-full min-w-[52rem] text-left text-sm">
             <thead className="border-b border-hairline bg-surface-2/70 text-xs uppercase tracking-wide text-fg-subtle">
               <tr>
-                <th className="px-4 py-3 font-medium">Mã đơn</th>
-                <th className="px-4 py-3 font-medium">Số tiền</th>
-                <th className="px-4 py-3 font-medium">Trả bằng</th>
-                <th className="px-4 py-3 font-medium">Trạng thái</th>
-                <th className="px-4 py-3 font-medium">Giao dịch</th>
-                <th className="px-4 py-3 font-medium">Tạo lúc</th>
+                <th className="px-4 py-3 font-medium">{t.orders.colRef}</th>
+                <th className="px-4 py-3 font-medium">{t.orders.colAmount}</th>
+                <th className="px-4 py-3 font-medium">{t.orders.colToken}</th>
+                <th className="px-4 py-3 font-medium">{t.orders.colStatus}</th>
+                <th className="px-4 py-3 font-medium">{t.orders.colTx}</th>
+                <th className="px-4 py-3 font-medium">{t.orders.colCreated}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
@@ -234,7 +245,7 @@ export default async function OrdersPage({
                           )}
                         </>
                       ) : (
-                        <span className="text-fg-subtle">chưa chọn</span>
+                        <span className="text-fg-subtle">{t.orders.noToken}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -242,11 +253,11 @@ export default async function OrdersPage({
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${style.className}`}
                       >
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} />
-                        {style.label}
+                        {t.status[order.status]}
                       </span>
                       {order.status === "seen" && (
                         <div className="mt-1 text-xs text-fg-subtle">
-                          {order.confirmations} xác nhận
+                          {t.orders.confirmations(order.confirmations)}
                         </div>
                       )}
                     </td>
@@ -265,7 +276,7 @@ export default async function OrdersPage({
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-fg-subtle">
-                      {order.createdAt.toLocaleString("vi-VN")}
+                      {order.createdAt.toLocaleString(t.dateLocale)}
                     </td>
                   </tr>
                 );
@@ -277,12 +288,12 @@ export default async function OrdersPage({
 
       {orders.length === limit && (
         <p className="mt-3 text-xs text-fg-subtle">
-          Đang hiện {limit} đơn gần nhất.{" "}
+          {t.orders.showing(limit)}{" "}
           <Link
             href={`/orders?${network ? `network=${network}&` : ""}limit=200`}
             className="text-brand-300 underline underline-offset-4"
           >
-            Xem 200 đơn
+            {t.orders.show200}
           </Link>
         </p>
       )}
@@ -297,7 +308,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <Link
             href="/"
             className="inline-flex min-h-11 items-center gap-2 rounded-lg pr-2 text-sm font-medium
@@ -317,6 +328,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </svg>
             Cardano Connect
           </Link>
+          <LanguageSwitcher />
         </div>
       </header>
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">

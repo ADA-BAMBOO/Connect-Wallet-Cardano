@@ -1,8 +1,11 @@
 import { WalletAppLoader } from "@/components/WalletAppLoader";
+import { getDictionary } from "@/lib/i18n/server";
 
 /* Nền trang trí nằm ở root layout (components/Ambient), không lặp lại ở từng page. */
 
-export default function Home() {
+export default async function Home() {
+  const t = await getDictionary();
+
   return (
     <>
       <WalletAppLoader />
@@ -10,7 +13,7 @@ export default function Home() {
       <footer className="mt-auto border-t border-hairline">
         <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-fg-subtle">
           <p className="leading-relaxed">
-            Dự án mẫu — dựng bằng Next.js và{" "}
+            {t.shell.footerBuiltWith}{" "}
             <a
               href="https://meshjs.dev"
               target="_blank"
@@ -20,7 +23,7 @@ export default function Home() {
             >
               Mesh SDK
             </a>
-            . Chuẩn kết nối:{" "}
+            . {t.shell.footerStandard}{" "}
             <a
               href="https://cips.cardano.org/cip/CIP-30"
               target="_blank"

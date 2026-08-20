@@ -3,6 +3,7 @@ import { after, NextResponse } from "next/server";
 import { getOrderView } from "@/lib/order-view";
 import { isValidRef } from "@/lib/ref";
 import { dispatchDueWebhooks } from "@/lib/webhook";
+import { getDictionary } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,15 +18,16 @@ export const dynamic = "force-dynamic";
  * các bản trước, quên await thì nhận về `[object Promise]` chứ không phải lỗi.
  */
 export async function GET(_request: Request, ctx: RouteContext<"/api/payments/orders/[ref]">) {
+  const t = await getDictionary();
   const { ref } = await ctx.params;
 
   // Kiểm định dạng trước khi hỏi DB: chặn rác trước khi tốn một vòng tới Postgres.
   if (!isValidRef(ref)) {
-    return NextResponse.json({ error: "Mã đơn không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.invalidRef }, { status: 400 });
   }
 
   const view = await getOrderView(ref);
-  if (!view) return NextResponse.json({ error: "Không tìm thấy đơn hàng." }, { status: 404 });
+  if (!view) return NextResponse.json({ error: t.api.orderNotFound }, { status: 404 });
 
   // Đây là nơi đơn THỰC SỰ được chốt trong đa số trường hợp: `getOrderView` đối chiếu
   // lại on-chain (có tiết chế), và người trả đang mở trang thanh toán poll vào đây mỗi

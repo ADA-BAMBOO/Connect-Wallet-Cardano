@@ -6,6 +6,7 @@ import { isCardanoNetwork } from "@/lib/network";
 import { createOrder, listOrders, serializeOrder } from "@/lib/orders";
 import { getEnabledNetworks, orderCreateLimit } from "@/lib/payment-config";
 import { guardRequest } from "@/lib/rate-limit";
+import { getDictionary } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ const CREATE_WINDOW_SECONDS = 3_600;
  * biến môi trường rồi sao vào đơn. Xem chú thích ở payment-config.ts.
  */
 export async function POST(request: Request) {
+  const t = await getDictionary();
   const limit = await guardRequest(request, "orders:create", orderCreateLimit(), CREATE_WINDOW_SECONDS);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Body không phải JSON hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.badJson }, { status: 400 });
   }
 
   const { network, amountUsd, description } = (body ?? {}) as Record<string, unknown>;
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
   const micro = parseAmount(String(amountUsd), USD_DECIMALS);
   if (micro === null) {
     return NextResponse.json(
-      { error: "Số tiền không hợp lệ (tối đa 6 chữ số thập phân, không âm)." },
+      { error: t.api.invalidAmount },
       { status: 400 },
     );
   }
@@ -92,6 +94,7 @@ export async function POST(request: Request) {
  * sổ sách kinh doanh, không phải dữ liệu công khai. Xem lib/admin.ts.
  */
 export async function GET(request: Request) {
+  const t = await getDictionary();
   const admin = await checkAdmin();
   if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
 
@@ -100,7 +103,7 @@ export async function GET(request: Request) {
   const limitParam = Number(url.searchParams.get("limit") ?? 25);
 
   if (networkParam !== null && !isCardanoNetwork(networkParam)) {
-    return NextResponse.json({ error: "Tham số network không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.invalidNetwork }, { status: 400 });
   }
 
   const orders = await listOrders({

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useDict } from "@/lib/i18n/client";
+
 /**
  * Tự tải lại dữ liệu server component của trang sổ đơn hàng.
  *
@@ -14,6 +16,7 @@ import { useRouter } from "next/navigation";
  */
 export function OrdersRefresher({ seconds = 10 }: { seconds?: number }) {
   const router = useRouter();
+  const t = useDict();
   const [lastAt, setLastAt] = useState<number | null>(null);
 
   useEffect(() => {
@@ -27,8 +30,8 @@ export function OrdersRefresher({ seconds = 10 }: { seconds?: number }) {
 
   return (
     <span className="text-xs text-fg-subtle">
-      Tự làm mới mỗi {seconds}s
-      {lastAt && ` · lần cuối ${new Date(lastAt).toLocaleTimeString("vi-VN")}`}
+      {t.orders.autoRefresh(seconds)}
+      {lastAt && t.orders.lastRefresh(new Date(lastAt).toLocaleTimeString(t.dateLocale))}
     </span>
   );
 }

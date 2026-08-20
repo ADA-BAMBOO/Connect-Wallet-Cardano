@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { claimFaucet, faucetClaimLimit } from "@/lib/faucet";
 import { clientKey, guardRequest } from "@/lib/rate-limit";
+import { getDictionary } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ const CLAIM_WINDOW_SECONDS = 3_600;
  * chính mình. Xem payment-config.ts.
  */
 export async function POST(request: Request) {
+  const t = await getDictionary();
   const limit = await guardRequest(request, "faucet:claim", faucetClaimLimit(), CLAIM_WINDOW_SECONDS);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Body không phải JSON hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.badJson }, { status: 400 });
   }
 
   const { address, units } = (body ?? {}) as Record<string, unknown>;

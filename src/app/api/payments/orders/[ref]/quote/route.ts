@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { looksLikePaymentAddress } from "@/lib/network";
 import { serializeOrder, setQuote } from "@/lib/orders";
 import { isValidRef } from "@/lib/ref";
+import { getDictionary } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,17 +21,18 @@ export const dynamic = "force-dynamic";
  * UPDATE chứ không kiểm ở tầng ứng dụng, nên hai request đồng thời không lách được.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/payments/orders/[ref]/quote">) {
+  const t = await getDictionary();
   const { ref } = await ctx.params;
 
   if (!isValidRef(ref)) {
-    return NextResponse.json({ error: "Mã đơn không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.invalidRef }, { status: 400 });
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Body không phải JSON hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.badJson }, { status: 400 });
   }
 
   const { unit, buyerAddress } = (body ?? {}) as Record<string, unknown>;
@@ -43,7 +45,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/payments/or
   // tới việc xác minh, nên khai sai cũng không lợi gì. Vẫn kiểm định dạng để không
   // lưu rác vào DB.
   if (buyerAddress !== undefined && buyerAddress !== null && !looksLikePaymentAddress(buyerAddress)) {
-    return NextResponse.json({ error: "buyerAddress không phải địa chỉ hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: t.api.invalidBuyerAddress }, { status: 400 });
   }
 
   const result = await setQuote(ref, unit.trim(), typeof buyerAddress === "string" ? buyerAddress : undefined);

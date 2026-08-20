@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Spinner } from "./ui";
+import { useDict } from "@/lib/i18n/client";
 
 /**
  * Mesh SDK và `window.cardano` chỉ tồn tại trên trình duyệt, nên toàn bộ app ví
@@ -13,15 +14,25 @@ import { Spinner } from "./ui";
  */
 const WalletApp = dynamic(() => import("./WalletApp"), {
   ssr: false,
-  loading: () => (
+  loading: () => <Loading />,
+});
+
+/**
+ * Tách thành component riêng chứ không viết thẳng JSX vào `loading`: hook chỉ gọi
+ * được trong thân một component, mà chuỗi ở đây phải lấy từ từ điển.
+ */
+function Loading() {
+  const t = useDict();
+
+  return (
     <div className="flex flex-1 items-center justify-center py-32">
       <div className="flex items-center gap-3 text-fg-muted">
         <Spinner className="text-brand-400" />
-        <span className="text-sm">Đang khởi tạo kết nối ví…</span>
+        <span className="text-sm">{t.shell.loadingWallet}</span>
       </div>
     </div>
-  ),
-});
+  );
+}
 
 export function WalletAppLoader() {
   return <WalletApp />;
