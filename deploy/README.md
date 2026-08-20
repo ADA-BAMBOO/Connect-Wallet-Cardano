@@ -1,70 +1,90 @@
-# Triển khai lên VPS (aaPanel) — pay.bboapp.xyz + demo.bboapp.xyz
+# Triển khai — pay.bboapp.xyz + demo.bboapp.xyz
 
-Hai subdomain, hai tiến trình Node, một nginx đứng trước, mạng **mainnet**.
+Hai máy: một VM chạy app trong LAN, một máy aaPanel cầm IP công cộng và làm reverse
+proxy. Mạng **mainnet**.
 
 ```
-                    ┌──────────────── VPS (aaPanel) ────────────────┐
-                    │   một thư mục /www/wwwroot/pay.bboapp.xyz      │
-  demo.bboapp.xyz ──┤ nginx :443 ──► 127.0.0.1:4100  shop demo      │
-                    │                    │  ① tạo đơn (khoá API)    │
-                    │                    ▼                          │
-   pay.bboapp.xyz ──┤ nginx :443 ──► 127.0.0.1:3000  cổng thanh toán│
-                    │                    │                          │
-                    │        Postgres :5432   Redis :6379           │
-                    │        (chỉ nghe 127.0.0.1)                   │
-                    │                    ▲                          │
-                    │   systemd timer 15s ┘ POST /api/payments/watcher
-                    └───────────────────────────────────────────────┘
-                                         │
-                                    Blockfrost (mainnet)
+                              ┌───────────────────────────────────────┐
+  Internet ──► máy aaPanel ──►│ 192.168.79.59  (VM "bamboolab")       │
+              (IP công cộng)  │                                       │
+              TLS ở đây       │  :4000  cổng thanh toán  npm start    │
+                              │  :4100  trang demo       demo:shop    │
+                              │     một checkout, một .env.local      │
+                              │                                       │
+                              │  docker: cardano-pay-postgres :5442   │
+                              │          cardano-pay-redis    :6389   │
+                              │                                       │
+                              │  systemd timer 15s ─► watcher         │
+                              └───────────────────────────────────────┘
+                                              │
+                                       Blockfrost (mainnet)
 ```
 
-Mọi file cấu hình nhắc tới bên dưới đều nằm sẵn trong thư mục này.
+Máy app **không có IP công cộng** — mọi thứ đi vào đều phải qua máy aaPanel.
+
+**Cổng 3000 và 3100 không dùng được**: chúng đã thuộc về stack `talosmine-*` chạy trên
+cùng VM. Cổng thanh toán dùng **4000**, trang demo dùng **4100**.
 
 > **Trang demo sẽ nhận tiền thật.** `KOLO_SHOP_NETWORK=mainnet` nghĩa là bất kỳ ai vào
 > demo.bboapp.xyz bấm mua đều tạo một đơn ADA/stablecoin thật, 4.90 / 49.00 / 9.90 USD
 > theo bảng hàng trong [`demo/kolo-shop/server.ts`](../demo/kolo-shop/server.ts), và
 > tiền chảy về `MERCHANT_ADDRESS_MAINNET`. Trang demo lại giữ đơn **trong RAM** —
 > restart tiến trình là mất hết đơn, người đã trả không tra cứu lại được ở phía shop
-> (cổng thanh toán vẫn giữ đủ trong Postgres). Nếu chỉ muốn *trình diễn*, đặt
-> `KOLO_SHOP_NETWORK=preprod` và bật thêm preprod ở cổng thanh toán — mục 10.
+> (cổng thanh toán vẫn giữ đủ trong Postgres). Chỉ muốn *trình diễn* thì đặt
+> `KOLO_SHOP_NETWORK=preprod` và bật thêm preprod ở cổng thanh toán — mục 9.
 
 ---
 
-## 1. DNS
+# Phần I — trên máy app (192.168.79.59)
 
-Hai bản ghi A trỏ về IP của VPS:
+## 1. Mã nguồn
 
-| Tên | Kiểu | Giá trị |
-|---|---|---|
-| `pay` | A | IP VPS |
-| `demo` | A | IP VPS |
-
-Dùng Cloudflare thì để **DNS only** (đám mây xám) lúc cấp SSL lần đầu; sau đó muốn bật
-proxy thì nhớ đổi `TRUSTED_PROXY_HOPS=2` — chi tiết ở mục 5.
-
-Chờ DNS lan rồi hãy làm tiếp. Cấp Let's Encrypt lúc DNS chưa trỏ đúng thì thất bại kèm
-một thông báo không nói lên nguyên nhân:
+Đã có sẵn ở `/home/talosmine/Connect-Wallet-Cardano`. Cập nhật về commit mới nhất:
 
 ```bash
-dig +short pay.bboapp.xyz demo.bboapp.xyz
+cd ~/Connect-Wallet-Cardano
+git fetch origin main && git reset --hard origin/main
 ```
 
-## 2. Chuẩn bị cho mainnet
+Cả hai tiến trình chạy từ thư mục này: `npm start` phục vụ pay.bboapp.xyz, còn
+`npm run demo:shop` phục vụ demo.bboapp.xyz. Chúng dùng chung một `node_modules`, một
+`.env.local`, và một lần `git pull` — nên không bao giờ có chuyện hai bên lệch phiên bản
+thuật toán ký webhook, thứ mà triệu chứng (401 hàng loạt) không hề chỉ về nguyên nhân.
 
-| Thứ cần | Lấy ở đâu | Kiểm tra |
-|---|---|---|
-| Blockfrost project **mainnet** | [blockfrost.io](https://blockfrost.io) → New project → Network **Mainnet** | Project id bắt đầu bằng `mainnet` |
-| Ví nhận tiền | Ví **bạn kiểm soát**, không phải địa chỉ nạp của sàn | Địa chỉ bắt đầu bằng `addr1` |
-| Địa chỉ stake để xem sổ đơn | Cùng ví đó, mục Account | Bắt đầu bằng `stake1` |
+Đánh đổi, nói cho rõ: `demo/kolo-shop/server.ts` nạp `.env.local` ở gốc repo, nên tiến
+trình demo đọc được toàn bộ biến của cổng thanh toán — `SESSION_SECRET`, chuỗi kết nối
+Postgres, Blockfrost key — trong khi nó chỉ cần hai khoá. Tách thư mục **không** sửa được
+điều này chừng nào hai tiến trình còn chạy dưới cùng user; cách ly thật phải đi kèm một
+user hệ thống riêng.
 
-Một project id chỉ nói chuyện được với đúng một mạng. Đặt nhầm key preprod vào ô mainnet
-thì đơn mainnet sẽ được đối chiếu trên chain preprod — nơi ADA xin miễn phí ở faucet.
-Ứng dụng chặn thẳng trường hợp này ở `/api/payments/health`, nhưng đừng để nó phải chặn.
+## 2. Postgres và Redis
 
-**Sinh secret mới, tất cả.** Đừng chép `.env.local` từ máy dev lên: những giá trị đó đã
-sống trên một máy có trình duyệt, có extension, có repo — dùng lại nghĩa là một lần lộ
-máy dev kéo theo cả nơi giữ tiền.
+Đã chạy sẵn bằng Docker:
+
+```bash
+docker ps --filter name=cardano-pay --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'
+```
+
+Phải thấy `cardano-pay-postgres` (5442) và `cardano-pay-redis` (6389). Chưa chạy thì
+`npm run db:up`. Hai cổng lệch chuẩn là cố ý — máy này đã có Postgres khác của stack
+`talosmine-*`.
+
+Mật khẩu hiện là `cardano/cardano` để trần trong `docker-compose.yml`, Redis chưa có
+`requirepass`. Máy không có IP công cộng nên chúng chỉ lộ ra LAN. Siết lại trước khi bật
+mainnet — mục 7.
+
+## 3. Biến môi trường
+
+Một file duy nhất, cả hai tiến trình cùng đọc:
+
+```bash
+cd ~/Connect-Wallet-Cardano
+cp deploy/env/pay.bboapp.xyz.env.example .env.local
+chmod 600 .env.local
+```
+
+Sinh secret **mới** ngay trên máy này, đừng chép từ `.env.local` của máy dev — giá trị đó
+đã sống trên một máy có trình duyệt, có extension, có repo:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"       # SESSION_SECRET
@@ -74,60 +94,41 @@ node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))" #
 node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))" # PAYMENT_HEALTH_TOKEN
 ```
 
-## 3. Postgres và Redis
+Mainnet cần thêm ba thứ lấy từ bên ngoài:
 
-aaPanel → **App Store**: cài **PostgreSQL 14+** và **Redis 6+**.
+| Biến | Lấy ở đâu | Kiểm tra |
+|---|---|---|
+| `BLOCKFROST_API_KEY_MAINNET` | [blockfrost.io](https://blockfrost.io) → New project → **Mainnet** | Bắt đầu bằng `mainnet` |
+| `MERCHANT_ADDRESS_MAINNET` | Ví **bạn kiểm soát**, không phải địa chỉ nạp của sàn | Bắt đầu bằng `addr1` |
+| `PAYMENT_ADMIN_ADDRESSES` | Địa chỉ stake của ví dùng để xem sổ đơn | Bắt đầu bằng `stake1` |
 
-- Postgres: tạo database `cardano_pay` với user riêng, mật khẩu mạnh.
-- Redis: đặt `requirepass` (aaPanel → Redis → Config).
-- **Cả hai chỉ nghe `127.0.0.1`.** Trong aaPanel → Security, đừng mở cổng 5432/6379 ra
-  ngoài. Redis không mật khẩu mà mở ra internet thì bị quét thấy trong vài phút.
+Một project id chỉ nói chuyện được với đúng một mạng. Đặt nhầm key preprod vào ô mainnet
+thì đơn mainnet sẽ được đối chiếu trên chain preprod — nơi ADA xin miễn phí ở faucet.
+`/api/payments/health` chặn thẳng trường hợp này, nhưng đừng để nó phải chặn.
 
-Redis không phải thứ tuỳ chọn ở đây: nó giữ cache tỷ giá ADA, khoá watcher và nonce
-đăng nhập.
+Bốn giá trị phải **trỏ đúng vào nhau**, lệch một ký tự là hỏng theo kiểu khó đoán:
 
-## 4. Mã nguồn — một thư mục, hai tiến trình
+| Biến | Giá trị | Sai thì sao |
+|---|---|---|
+| `PAYMENT_PUBLIC_URL` | `https://pay.bboapp.xyz` | Khách bị đưa tới link nội bộ |
+| `KOLO_PAY_URL` | `https://pay.bboapp.xyz` | Trang demo gọi vào hư không |
+| `KOLO_SHOP_URL` | `https://demo.bboapp.xyz` | returnUrl trỏ sai chỗ |
+| `MERCHANT_RETURN_URL_ORIGINS` | phải **chứa** `https://demo.bboapp.xyz` | Tạo đơn bị từ chối vì returnUrl không nằm trong allowlist |
 
-```bash
-cd /www/wwwroot
-git clone https://github.com/ADA-BAMBOO/Connect-Wallet-Cardano.git pay.bboapp.xyz
-chown -R www:www pay.bboapp.xyz
-```
+`MERCHANT_API_KEYS` và `MERCHANT_WEBHOOK_SECRET` chỉ khai một lần — trang demo đọc đúng
+file này, nên không còn cửa để hai bên lệch nhau.
 
-Cả hai tiến trình chạy từ thư mục này: `npm start` phục vụ pay.bboapp.xyz, còn
-`npm run demo:shop` phục vụ demo.bboapp.xyz. Chúng dùng chung một `node_modules`, một
-`.env.local`, và một lần `git pull` — nên không bao giờ có chuyện hai bên lệch phiên
-bản thuật toán ký webhook, thứ mà triệu chứng (401 hàng loạt) không hề chỉ về nguyên
-nhân.
+**`TRUSTED_PROXY_HOPS`** — số proxy tin cậy đứng trước app. Chỉ nginx của máy aaPanel thì
+`1`; nếu bboapp.xyz còn đi qua Cloudflare bật proxy thì `2`. Đặt sai thì hạn mức theo IP
+hoặc mất tác dụng hoàn toàn (mỗi request rơi vào một bucket riêng), hoặc gom cả thiên hạ
+vào một bucket. `/api/payments/health` báo rõ khi biến này vắng mặt.
 
-Thư mục site `demo.bboapp.xyz` mà aaPanel tạo vẫn giữ nguyên, để trống — nginx chỉ cần
-nó làm chỗ xác thực ACME lúc gia hạn chứng chỉ. Không có mã nguồn nào nằm ở đó.
+Để `PAYMENT_ENABLED_MAINNET=false` lúc này. Bật ở mục 8, sau khi mọi thứ đã xanh.
 
-**Đánh đổi, nói cho rõ:** `demo/kolo-shop/server.ts` nạp `.env.local` ở gốc repo, nên
-tiến trình demo đọc được toàn bộ biến của cổng thanh toán — `SESSION_SECRET`, chuỗi kết
-nối Postgres, Blockfrost key — trong khi nó chỉ cần hai khoá. Tách thành hai thư mục
-cũng **không** sửa được điều này nếu cả hai tiến trình cùng chạy dưới user `www`: tiến
-trình demo đọc thẳng file của thư mục kia. Muốn cách ly thật thì phải cho trang demo một
-**user hệ thống riêng** — xem mục 7.
-
-**Node.** Cần **Node 22.6+** — trang demo chạy thẳng file `.ts`, dựa vào type stripping
-của Node. Node 24 LTS là lựa chọn an toàn. aaPanel cài Node qua App Store → Node.js
-Version Manager; nhớ đường dẫn thật của `npm`, các unit systemd cần nó:
+## 4. Cài, migrate, build
 
 ```bash
-which npm     # ví dụ /www/server/nodejs/v24.9.0/bin/npm
-```
-
-**Build.** `next build` với Mesh SDK ngốn RAM. VPS dưới 2 GB thì tạo swap trước, không
-thì build chết giữa chừng với chữ `killed` — thông báo đó không nói gì về nguyên nhân:
-
-```bash
-fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-```
-
-```bash
-cd /www/wwwroot/pay.bboapp.xyz
+cd ~/Connect-Wallet-Cardano
 npm ci
 npm run migrate      # tạo bảng; chạy được nhiều lần, có khoá chống chạy song song
 npm run build
@@ -137,246 +138,198 @@ npm run build
 `.env.local`, mà gói đó nằm trong `devDependencies` — bỏ dev là tiến trình demo chết ngay
 lúc khởi động. `next build` cũng cần TypeScript và Tailwind.
 
-`npm run migrate` cần `.env.local` đã có `DATABASE_URL` — làm mục 5 trước rồi quay lại
-đây. `npm run migrate -- --status` liệt kê mà không đụng gì.
-
-## 5. Biến môi trường
-
-Một file duy nhất, cả hai tiến trình cùng đọc:
+`next build` với Mesh SDK ngốn RAM. Dưới 2 GB trống thì build chết giữa chừng với chữ
+`killed`, thông báo đó không nói gì về nguyên nhân. Kiểm tra bằng `free -h`; thiếu thì
+tạo swap:
 
 ```bash
-cd /www/wwwroot/pay.bboapp.xyz
-cp deploy/env/pay.bboapp.xyz.env.example .env.local
-chmod 600 .env.local && chown www:www .env.local
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
-Điền theo chú thích trong file. Khối `KOLO_*` ở cuối file là phần của trang demo — nó nằm
-chung ở đây vì hai tiến trình dùng chung thư mục.
+## 5. Hai tiến trình + watcher
 
-Bốn giá trị phải **trỏ đúng vào nhau**, lệch một ký tự là hỏng theo kiểu khó đoán:
+Ba unit trong [`systemd/`](systemd/) đã điền sẵn user `talosmine`, thư mục
+`/home/talosmine/Connect-Wallet-Cardano`, và đường dẫn npm của nvm
+(`/home/talosmine/.nvm/versions/node/v25.2.1/bin`).
 
-| Biến | Giá trị | Sai thì sao |
-|---|---|---|
-| `PAYMENT_PUBLIC_URL` | `https://pay.bboapp.xyz` | Khách bị đưa tới link `localhost` |
-| `KOLO_PAY_URL` | `https://pay.bboapp.xyz` | Trang demo gọi vào hư không |
-| `KOLO_SHOP_URL` | `https://demo.bboapp.xyz` | returnUrl trỏ sai chỗ |
-| `MERCHANT_RETURN_URL_ORIGINS` | phải **chứa** `https://demo.bboapp.xyz` | Tạo đơn bị từ chối vì returnUrl không nằm trong allowlist |
-
-So khớp **chính xác**: `https` chứ không `http`, không dấu `/` ở cuối, đúng subdomain.
-
-`MERCHANT_API_KEYS` và `MERCHANT_WEBHOOK_SECRET` giờ chỉ khai một lần — trang demo đọc
-đúng file này, nên không còn cửa để hai bên lệch nhau.
-
-**`TRUSTED_PROXY_HOPS`** — số proxy tin cậy đứng trước app. Chỉ nginx của aaPanel thì
-`1`; thêm Cloudflare bật proxy thì `2`. Đặt sai thì hạn mức theo IP hoặc mất tác dụng
-hoàn toàn (mỗi request rơi vào một bucket riêng), hoặc gom cả thiên hạ vào một bucket.
-`/api/payments/health` báo rõ khi biến này vắng mặt.
-
-Để `PAYMENT_ENABLED_MAINNET=false` lúc này. Bật ở mục 9, sau khi mọi thứ đã xanh.
-
-## 6. nginx + SSL
-
-Với **mỗi** subdomain, trong aaPanel:
-
-1. **Website → Add site**: domain `pay.bboapp.xyz` (rồi `demo.bboapp.xyz`), không tạo
-   FTP, không tạo database, PHP chọn **Static/Pure**.
-2. **SSL → Let's Encrypt** → cấp chứng chỉ → bật **Force HTTPS**.
-3. **Config file** → thay phần thân bằng [`nginx/pay.bboapp.xyz.conf`](nginx/pay.bboapp.xyz.conf)
-   / [`nginx/demo.bboapp.xyz.conf`](nginx/demo.bboapp.xyz.conf). Xoá các `location` mặc
-   định phục vụ file tĩnh và PHP — ở đây không có file tĩnh nào để phục vụ.
-4. `nginx -t && systemctl reload nginx`
-
-Điểm dễ hỏng nhất là dòng `X-Forwarded-For`. Nó có sẵn trong hai file conf; đừng đổi
-thành `$remote_addr`.
-
-**Nếu bật WAF của aaPanel** (Nginx Free WAF): thêm ngoại lệ cho các đường API, nếu không
-nó chặn POST kèm JSON và bạn sẽ đi tìm lỗi ở nhầm chỗ.
-
-| Site | Đường cần bỏ qua |
-|---|---|
-| pay.bboapp.xyz | `/api/` (gồm `/api/v1/orders` và `/api/payments/watcher`) |
-| demo.bboapp.xyz | `/api/webhooks/kolo-pay` |
-
-**Tường lửa.** aaPanel → Security: chỉ mở 80, 443, và cổng SSH. Đóng **3000, 4100,
-5432, 6379**. Hai tiến trình Node nghe trên mọi interface (cổng thanh toán chỉ nghe
-loopback nếu chạy bằng systemd của mục 7, trang demo thì luôn nghe mọi interface —
-`server.listen(PORT)` trong `demo/kolo-shop/server.ts` không có cờ nào đổi được).
-Cổng 4100 để hở nghĩa là `http://IP:4100` vào thẳng: không https, không WAF, không
-hạn mức của nginx.
-
-## 7. Chạy hai tiến trình
-
-Hai lựa chọn, **chọn một**. Chạy cả hai thì bản khởi động sau chết vì cổng đã bị chiếm,
-và triệu chứng trông y hệt "deploy không ăn".
-
-**Cách A — trình quản lý Node của aaPanel (PM2).** App Store → Node.js Project → Add
-project. Hai project, **cùng một thư mục**:
-
-| | Cổng thanh toán | Trang demo |
-|---|---|---|
-| Thư mục | `/www/wwwroot/pay.bboapp.xyz` | `/www/wwwroot/pay.bboapp.xyz` |
-| Lệnh chạy | `npm start` | `npm run demo:shop` |
-| Cổng | 3000 | 4100 |
-| Tự khởi động | bật | bật |
-
-Trong ô cấu hình của aaPanel, **bỏ** phần map domain — nginx đã lo ở mục 6.
-
-**Cách B — systemd.** Các file trong [`systemd/`](systemd/). Sửa `ExecStart` cho khớp
-đường dẫn `npm` thật (mục 4) rồi:
+**Nâng cấp Node bằng nvm là phải sửa lại đường dẫn đó** trong cả hai unit, nếu không
+service chết với `status=203/EXEC` — lỗi này chỉ nói "không chạy được file", không nói vì
+sao. Cùng lý do, `ProtectHome` đã bị bỏ khỏi cả hai unit: mã nguồn lẫn Node đều nằm trong
+`/home/talosmine`.
 
 ```bash
-cp deploy/systemd/kolo-pay.service deploy/systemd/kolo-demo.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now kolo-pay kolo-demo
-journalctl -u kolo-pay -f
-journalctl -u kolo-demo -f     # nhật ký ①③✓ của luồng demo nằm ở đây
+cd ~/Connect-Wallet-Cardano
+sudo cp deploy/systemd/kolo-pay.service deploy/systemd/kolo-demo.service \
+        deploy/systemd/kolo-watcher.service deploy/systemd/kolo-watcher.timer \
+        /etc/systemd/system/
+
+printf 'PAYMENT_WATCHER_SECRET=%s\n' 'giá-trị-thật-trong-.env.local' \
+  | sudo tee /etc/kolo-watcher.env > /dev/null
+sudo chmod 600 /etc/kolo-watcher.env
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now kolo-pay kolo-demo kolo-watcher.timer
 ```
 
-Kiểm tra hai tiến trình đã nghe đúng chỗ trước khi đi tiếp:
+Kiểm tra:
 
 ```bash
-curl -sI http://127.0.0.1:3000 | head -1
-curl -sI http://127.0.0.1:4100 | head -1
+curl -sI http://127.0.0.1:4000 | head -1      # cổng thanh toán
+curl -sI http://127.0.0.1:4100 | head -1      # trang demo
+systemctl list-timers kolo-watcher
+journalctl -u kolo-demo -f                    # nhật ký ①③✓ của luồng demo
 ```
-
-**Nếu sau này muốn cách ly thật sự trang demo.** Bố cục một thư mục không làm được điều
-đó, kể cả khi cho trang demo một user riêng: nó cần đọc `.env.local` để lấy hai khoá, mà
-file đó cũng chính là nơi giữ `SESSION_SECRET` và mật khẩu Postgres. Muốn tách thì phải
-tách cả ba thứ cùng lúc —
-
-1. checkout riêng ở `/www/wwwroot/demo.bboapp.xyz`,
-2. `.env.local` riêng, chỉ có khối `KOLO_*` cùng `MERCHANT_API_KEYS` và
-   `MERCHANT_WEBHOOK_SECRET` (dùng [`env/demo.bboapp.xyz.env.example`](env/demo.bboapp.xyz.env.example)),
-3. user hệ thống riêng (`useradd -r -s /usr/sbin/nologin kolo-demo`), đặt vào
-   `User=`/`Group=` của `kolo-demo.service` và `chown` thư mục đó cho user ấy.
-
-Thiếu bước 3 thì hai bước đầu chỉ là dọn dẹp cho gọn: hai tiến trình cùng chạy dưới `www`
-thì bên nào cũng đọc được file của bên kia.
-
-## 8. Watcher
 
 **Không có watcher thì không đơn nào chuyển sang `confirmed`.** Trang `/pay/<ref>` tự làm
 mới được khi có người đang mở tab, nhưng khoản trả bằng QR từ máy khác thì không ai nhìn.
 Lượt quét này cũng là đường **bảo đảm** duy nhất để webhook về được trang shop: các đường
-khác đều là đi tắt và có thể không xảy ra.
+khác đều là đi tắt và có thể không xảy ra. Nó gọi thẳng `127.0.0.1:4000`, không vòng ra
+tên miền — bớt phụ thuộc DNS, TLS và một máy khác cho một việc nội bộ chạy mỗi 15 giây.
 
-```bash
-printf 'PAYMENT_WATCHER_SECRET=%s\n' 'giá-trị-thật' > /etc/kolo-watcher.env
-chmod 600 /etc/kolo-watcher.env
+---
 
-cp deploy/systemd/kolo-watcher.service deploy/systemd/kolo-watcher.timer /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now kolo-watcher.timer
-systemctl list-timers kolo-watcher
+# Phần II — trên máy aaPanel
+
+## 6. Hai site reverse proxy
+
+DNS: `pay` và `demo` đều là bản ghi A trỏ về **IP công cộng của máy aaPanel** — không phải
+192.168.79.59, địa chỉ đó không định tuyến được từ internet.
+
+Với mỗi subdomain, trong aaPanel:
+
+1. **Website → Add site** — không tạo FTP, không tạo database, PHP chọn Static/Pure.
+2. **SSL → Let's Encrypt** → cấp chứng chỉ → bật **Force HTTPS**.
+3. **Config file** → dán [`nginx/pay.bboapp.xyz.conf`](nginx/pay.bboapp.xyz.conf) /
+   [`nginx/demo.bboapp.xyz.conf`](nginx/demo.bboapp.xyz.conf), đã trỏ sẵn upstream
+   `192.168.79.59:4000` và `:4100`. Xoá các `location` mặc định phục vụ file tĩnh và PHP.
+4. `nginx -t && systemctl reload nginx`
+
+Dùng nút **Reverse Proxy** của aaPanel cũng được, nhưng phải kiểm tra đủ ba header —
+thiếu là hỏng theo kiểu khó truy:
+
+| Header | Thiếu thì sao |
+|---|---|
+| `X-Forwarded-For $proxy_add_x_forwarded_for` | Hạn mức theo IP đọc nhầm, mọi người chung một bucket |
+| `X-Forwarded-Proto $scheme` | App tưởng đang chạy http |
+| `Host $host` | Link và cookie sai domain |
+
+Bật WAF thì thêm ngoại lệ cho `/api/` ở site pay và `/api/webhooks/kolo-pay` ở site demo,
+nếu không nó chặn POST kèm JSON và bạn sẽ đi tìm lỗi ở nhầm chỗ.
+
+## 7. Siết mạng trước khi bật mainnet
+
+Làm trên máy app.
+
+**a. Đóng Postgres và Redis khỏi LAN.** Không tiến trình nào ngoài máy này cần chúng:
+
+```yaml
+# docker-compose.yml
+ports:
+  - "127.0.0.1:5442:5432"     # thay cho "5442:5432"
+  - "127.0.0.1:6389:6379"     # thay cho "6389:6379"
 ```
 
-Thích dùng aaPanel → Cron hơn thì tạo một **Shell Script** chạy **mỗi 1 phút**, nội dung
-gọi [`watcher.sh`](watcher.sh). Đánh đổi: chậm hơn, khách nhìn thanh tiến trình lâu hơn
-tới một phút. Secret nằm ở `/etc/kolo-watcher.env` chứ không viết thẳng vào ô lệnh — lệnh
-cron hiện nguyên văn trong `ps aux` của mọi user trên máy.
+`docker compose up -d` để áp dụng. Mật khẩu `cardano/cardano` khi đó chỉ còn với được từ
+chính máy này.
 
-Gọi chồng nhau không sao: mỗi đơn được bọc trong một khoá Redis, và ràng buộc ở tầng dữ
-liệu giữ cho kết quả đúng ngay cả khi khoá hết hạn giữa chừng.
+**b. Chỉ cho máy aaPanel gọi vào 4000/4100.** iptables đang trống (policy ACCEPT), nghĩa
+là mọi máy trong LAN đều gọi thẳng vào hai cổng đó, bỏ qua TLS và WAF:
 
-## 9. Bật mainnet
+```bash
+sudo iptables -A INPUT -p tcp -s <IP-LAN-của-máy-aaPanel> --dport 4000 -j ACCEPT
+sudo iptables -A INPUT -p tcp -s <IP-LAN-của-máy-aaPanel> --dport 4100 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 4000 -j DROP
+sudo iptables -A INPUT -p tcp --dport 4100 -j DROP
+```
 
-Theo đúng thứ tự này. Mainnet mặc định tắt là có chủ đích: nhận tiền thật phải là một
-hành động cố ý, không phải hệ quả phụ của việc điền xong biến môi trường.
+Nhớ lưu lại để sống qua reboot (`netfilter-persistent save`), và đừng khoá nhầm SSH.
 
-**a. Kiểm tra khi mainnet còn tắt** — mong đợi `ready: false` với đúng một lý do là
-"Mainnet chưa bật":
+**c. Chặng aaPanel → app là http trần.** Nằm trong LAN riêng nên chấp nhận được. Nếu hai
+máy nói chuyện qua internet công cộng thì phải dựng WireGuard giữa chúng — mã đơn và
+trạng thái thanh toán không nên đi ở dạng thô.
+
+---
+
+# Phần III — bật mainnet và vận hành
+
+## 8. Bật mainnet
+
+Theo đúng thứ tự. Mainnet mặc định tắt là có chủ đích: nhận tiền thật phải là một hành
+động cố ý, không phải hệ quả phụ của việc điền xong biến môi trường.
+
+**a. Kiểm tra khi còn tắt** — mong đợi mainnet chỉ còn đúng một lý do là "Mainnet chưa bật":
 
 ```bash
 curl -s -H "x-health-token: $PAYMENT_HEALTH_TOKEN" \
-  https://pay.bboapp.xyz/api/payments/health | jq
+  http://127.0.0.1:4000/api/payments/health | jq
 ```
 
-Trường `problems` của mạng mainnet nói rõ còn thiếu gì. Sửa cho tới khi chỉ còn đúng dòng
-"Mainnet chưa bật".
-
-**b. Bật.** Đổi `PAYMENT_ENABLED_MAINNET=true` trong `.env.local` rồi khởi động lại tiến
-trình (`systemctl restart kolo-pay`, hoặc nút Restart của aaPanel). Biến môi trường chỉ
-đọc lúc khởi động.
-
-**c. Xác nhận:** gọi lại lệnh trên, phải thấy `"ready": true` và mainnet
-`"enabled": true`.
-
-**d. Chạy thử một đơn nhỏ bằng tiền thật.** Mở demo.bboapp.xyz, mua gói rẻ nhất, trả bằng
-ví mainnet của chính bạn, theo dõi tới cùng:
+**b. Kiểm tra từ ngoài vào**, sau khi máy aaPanel đã xong:
 
 ```bash
-journalctl -u kolo-demo -f    # phải thấy ① tạo đơn → ③ webhook order.confirmed → ✓ GIAO HÀNG
+curl -s -H "x-health-token: …" https://pay.bboapp.xyz/api/payments/health | jq '.ok, .rateLimit'
 ```
 
-Rồi mở https://pay.bboapp.xyz/orders, đăng nhập bằng ví có địa chỉ stake nằm trong
-`PAYMENT_ADMIN_ADDRESSES`, kiểm tra đơn hiện đúng số tiền và đúng txHash. Tiền phải thật
-sự nằm trong ví nhận — kiểm tra trên [cardanoscan.io](https://cardanoscan.io), đừng chỉ
-tin màn hình xanh.
+Hai lượt khác nhau ở chỗ lượt thứ hai đi qua nginx — nó là thứ duy nhất chứng minh proxy,
+DNS và TLS đã đúng.
+
+**c. Bật.** `PAYMENT_ENABLED_MAINNET=true` trong `.env.local`, rồi
+`sudo systemctl restart kolo-pay`. Biến môi trường chỉ đọc lúc khởi động.
+
+**d. Xác nhận** `"ready": true` và mainnet `"enabled": true`.
+
+**e. Mua thử một đơn thật.** Mở demo.bboapp.xyz, mua gói rẻ nhất, trả bằng ví mainnet của
+chính bạn, theo dõi `journalctl -u kolo-demo -f` tới dòng `✓ GIAO HÀNG`. Rồi mở
+https://pay.bboapp.xyz/orders, đăng nhập bằng ví có địa chỉ stake trong
+`PAYMENT_ADMIN_ADDRESSES`, đối chiếu số tiền và txHash. Tiền phải thật sự nằm trong ví
+nhận — kiểm tra trên [cardanoscan.io](https://cardanoscan.io), đừng chỉ tin màn hình xanh.
 
 Đây là bước duy nhất chứng minh cả chuỗi chạy được. Bỏ qua nó thì lỗi đầu tiên bạn gặp sẽ
 là của một khách hàng thật.
 
-## 10. Muốn demo chạy preprod trong khi cổng thanh toán phục vụ mainnet
+## 9. Muốn demo chạy preprod trong khi cổng thanh toán phục vụ mainnet
 
 Hợp lý khi trang demo là để *cho xem*, không phải để bán. Cổng thanh toán bật được nhiều
 mạng cùng lúc; mạng nào dùng cho đơn nào là do bên gọi khai.
 
-Bên `pay.bboapp.xyz/.env.local`, thêm cạnh khối mainnet:
+Thêm vào `.env.local`:
 
 ```bash
 BLOCKFROST_API_KEY_PREPROD=preprod...
 MERCHANT_ADDRESS_PREPROD=addr_test1...
 STABLECOINS_PREPROD=[…]        # do `npm run mint:test-stablecoins` in ra ở máy dev
+KOLO_SHOP_NETWORK=preprod
 FAUCET_ENABLED=true            # để người xem tự lấy token thử
-FAUCET_MNEMONIC="…"            # ví mint — cân nhắc kỹ, xem bên dưới
+FAUCET_MNEMONIC="…"            # ví mint — cân nhắc kỹ
 ```
 
-Bên `demo.bboapp.xyz/.env.local`: `KOLO_SHOP_NETWORK=preprod`.
+Cân nhắc nằm ở `FAUCET_MNEMONIC`: bật faucet là đặt một seed phrase lên đúng cái máy đang
+giữ cổng nhận tiền thật. Ví đó chỉ có tADA nên mất cũng không sao, nhưng nó là thêm một bí
+mật để lộ và thêm một endpoint công khai tiêu tài nguyên. Không bật thì người xem tự xin
+tADA ở [faucet chính thức](https://docs.cardano.org/cardano-testnets/tools/faucet).
 
-Cân nhắc thật sự nằm ở `FAUCET_MNEMONIC`. Bật faucet là đặt một seed phrase lên đúng cái
-máy đang giữ cổng nhận tiền thật. Ví đó chỉ có tADA nên mất cũng không sao, nhưng nó là
-thêm một bí mật để lộ và thêm một endpoint công khai tiêu tài nguyên. Không bật thì người
-xem tự xin tADA ở [faucet chính thức](https://docs.cardano.org/cardano-testnets/tools/faucet)
-— chậm hơn một chút, sạch hơn nhiều.
-
-## 11. Sau khi deploy
+## 10. Deploy lại
 
 ```bash
-# Cổng thanh toán sẵn sàng
-curl -s -H "x-health-token: $PAYMENT_HEALTH_TOKEN" https://pay.bboapp.xyz/api/payments/health | jq
-
-# Watcher đang thật sự chạy
-systemctl list-timers kolo-watcher
-journalctl -u kolo-watcher --since '5 min ago'
-
-# Bộ kiểm thử nhắm vào môi trường đã deploy — CHÚ Ý: tạo đơn thật, có ghi database.
-# Chạy khi mainnet CÒN TẮT, hoặc chấp nhận dọn đơn test sau.
-npm run verify:api https://pay.bboapp.xyz
-```
-
-**Khi cập nhật mã nguồn:**
-
-```bash
-cd /www/wwwroot/pay.bboapp.xyz
+cd ~/Connect-Wallet-Cardano
 git pull && npm ci && npm run migrate && npm run build
-systemctl restart kolo-pay kolo-demo
+sudo systemctl restart kolo-pay kolo-demo
 ```
 
-Một thư mục nên chỉ một lượt pull, và hai tiến trình luôn cùng phiên bản — không có cửa
-để bên này ký webhook bằng thuật toán mà bên kia chưa biết.
+Một thư mục nên chỉ một lượt pull, và hai tiến trình luôn cùng phiên bản. `next build`
+chạy khi tiến trình cũ vẫn đang phục vụ, nên chỉ gián đoạn vài giây lúc restart. Có
+migration mới thì migrate **trước** khi restart. Nhớ restart cả `kolo-demo`: nó chạy thẳng
+file `.ts` nên không cần build, nhưng mã cũ vẫn nằm trong RAM.
 
-`next build` chạy khi tiến trình cũ vẫn đang phục vụ, nên trang chỉ gián đoạn vài giây
-lúc restart. Có migration mới thì chạy `npm run migrate` **trước** khi restart. Nhớ
-restart cả `kolo-demo`: nó chạy thẳng file `.ts` nên không cần build, nhưng mã cũ vẫn
-nằm trong RAM cho tới khi khởi động lại.
+## 11. Những chỗ hành xử khác lúc chạy ở localhost
 
-## Những chỗ hành xử khác lúc chạy ở localhost
-
-| | Ở localhost | Ở hai subdomain |
+| | Ở localhost | Ở đây |
 |---|---|---|
-| **Ngôn ngữ** | Bấm VI/EN ở một bên, bên kia đi theo — cookie `cardano_locale` phân định theo host, mà cả hai cùng ở `localhost` | Hai host khác nhau nên **không** dùng chung cookie. Khách bấm VI ở demo rồi sang trang thanh toán vẫn thấy ngôn ngữ mặc định. Đặt `DEFAULT_LOCALE` giống nhau ở hai bên để ít nhất mặc định là khớp |
+| **Ngôn ngữ** | Bấm VI/EN ở một bên, bên kia đi theo — cookie `cardano_locale` phân định theo host, mà cả hai cùng ở `localhost` | Hai host khác nhau nên **không** dùng chung cookie. Đặt `DEFAULT_LOCALE` giống nhau để ít nhất mặc định là khớp |
 | **Cookie phiên** | Không có cờ `Secure` | Có `Secure` (do `NODE_ENV=production`). Vào bằng http thuần sẽ không đăng nhập được — Force HTTPS ở mục 6 lo việc này |
-| **returnUrl** | Tự động nhận mọi địa chỉ localhost | Chỉ nhận origin nằm trong `MERCHANT_RETURN_URL_ORIGINS`, và bắt buộc https |
+| **returnUrl** | Tự động nhận mọi địa chỉ localhost | Chỉ nhận origin trong `MERCHANT_RETURN_URL_ORIGINS`, bắt buộc https |
 | **Faucet** | Bật sẵn | Tắt sẵn, phải khai `FAUCET_ENABLED=true` |
 | **Hạn mức tạo đơn** | 500/giờ/IP | 30/giờ/IP — chỉnh bằng `PAYMENT_ORDER_RATE_LIMIT` |
 | **Sổ đơn `/orders`** | Ai cũng xem được | Khoá hẳn nếu `PAYMENT_ADMIN_ADDRESSES` trống |

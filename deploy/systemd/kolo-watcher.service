@@ -13,7 +13,10 @@ Description=Kolo Pay watcher — quet on-chain va day hang doi webhook
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/kolo-watcher.env
+# Gọi thẳng vào tiến trình ở localhost thay vì https://pay.bboapp.xyz: đi qua tên
+# miền là traffic chạy ra máy aaPanel rồi vòng ngược lại qua LAN, phụ thuộc thêm
+# DNS, TLS và một máy khác — cho một lượt quét nội bộ chạy mỗi 15 giây.
 ExecStart=/usr/bin/curl -fsS --max-time 60 -X POST \
-  https://pay.bboapp.xyz/api/payments/watcher \
+  http://127.0.0.1:4000/api/payments/watcher \
   -H "authorization: Bearer ${PAYMENT_WATCHER_SECRET}" \
   -o /dev/null

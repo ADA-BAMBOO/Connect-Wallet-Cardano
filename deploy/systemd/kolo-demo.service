@@ -1,11 +1,12 @@
 # /etc/systemd/system/kolo-demo.service
 #
-#   systemctl enable --now kolo-demo
+#   sudo cp deploy/systemd/kolo-demo.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now kolo-demo
 #   journalctl -u kolo-demo -f      ← nhật ký ①③✓ của luồng demo nằm ở đây
 #
-# Trang demo giữ đơn hàng TRONG RAM: mỗi lần restart là mất sạch đơn cũ, và
-# trang /don-hang/<id> của khách cũ trả 404. Đó là hành vi đã biết của bản demo
-# (xem demo/README.md), không phải lỗi cấu hình.
+# Trang demo giữ đơn hàng TRONG RAM: mỗi lần restart là mất sạch đơn cũ, và trang
+# /don-hang/<id> của khách cũ trả 404. Đó là hành vi đã biết của bản demo (xem
+# demo/README.md), không phải lỗi cấu hình.
 
 [Unit]
 Description=Kolo Shop demo (demo.bboapp.xyz)
@@ -14,21 +15,20 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=www
-Group=www
+User=talosmine
+Group=talosmine
+
 # Cùng thư mục với kolo-pay: hai tiến trình chạy từ một checkout, đọc chung
-# .env.local. Tách ra thư mục riêng thì đổi dòng này VÀ đổi User=/Group= sang
-# một user riêng — xem deploy/README.md mục 7, tách nửa vời không được gì.
-WorkingDirectory=/www/wwwroot/pay.bboapp.xyz
+# .env.local — nên MERCHANT_API_KEYS và MERCHANT_WEBHOOK_SECRET chỉ khai một lần.
+WorkingDirectory=/home/talosmine/Connect-Wallet-Cardano
 
-# Không đặt NODE_ENV=production: server.ts là TypeScript chạy trực tiếp, không
-# qua bước build, và biến này không đổi gì ở phía nó. Cấu hình nằm ở .env.local
-# trong WorkingDirectory.
-ExecStart=/usr/bin/npm run demo:shop
+# Không đặt NODE_ENV=production: server.ts là TypeScript chạy trực tiếp, không qua
+# bước build, và biến này không đổi gì ở phía nó.
+Environment=PATH=/home/talosmine/.nvm/versions/node/v25.2.1/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/talosmine/.nvm/versions/node/v25.2.1/bin/npm run demo:shop
 
-# LƯU Ý: demo/kolo-shop/server.ts gọi `server.listen(PORT)` nên nó nghe trên MỌI
-# interface — không có cờ nào để bắt nó chỉ nghe loopback. Chặn cổng 4100 trong
-# tường lửa aaPanel, nếu không http://IP:4100 vào thẳng, bỏ qua https và WAF.
+# Cổng 4100 lấy từ KOLO_SHOP_PORT trong .env.local. 3100 không dùng được —
+# container talosmine-api đã chiếm.
 
 Restart=always
 RestartSec=5
@@ -38,8 +38,6 @@ SyslogIdentifier=kolo-demo
 
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target

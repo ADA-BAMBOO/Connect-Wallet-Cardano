@@ -1,33 +1,38 @@
 # /etc/systemd/system/kolo-pay.service
 #
-#   systemctl daemon-reload
-#   systemctl enable --now kolo-pay
+#   sudo cp deploy/systemd/kolo-pay.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now kolo-pay
 #   journalctl -u kolo-pay -f
 #
-# Dùng systemd thay cho trình quản lý Node của aaPanel (PM2) khi muốn log đi vào
-# journald và tiến trình sống lại sau khi reboot mà không phụ thuộc panel.
-# Chọn MỘT trong hai, đừng chạy cả hai — hai bản cùng nghe cổng 3000 thì bản sau
-# chết ngay lúc khởi động và triệu chứng trông như "deploy không ăn".
+# Cổng thanh toán: Next.js chạy bằng `next start`, nghe 0.0.0.0:4000 trong LAN.
+# TLS và tên miền do máy aaPanel ở trước lo — máy này không có IP công cộng.
 
 [Unit]
-Description=Kolo Pay — cong thanh toan Cardano (pay.bboapp.xyz)
-After=network-online.target postgresql.service redis.service
+Description=Kolo Pay - cong thanh toan Cardano (pay.bboapp.xyz)
+
+# Postgres và Redis chạy trong Docker (cardano-pay-postgres / cardano-pay-redis),
+# không phải service hệ thống — nên phụ thuộc vào docker chứ không postgresql.service.
+After=network-online.target docker.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=www
-Group=www
-WorkingDirectory=/www/wwwroot/pay.bboapp.xyz
+User=talosmine
+Group=talosmine
+WorkingDirectory=/home/talosmine/Connect-Wallet-Cardano
 
-# next start đọc .env.local trong WorkingDirectory, nên không cần EnvironmentFile.
 Environment=NODE_ENV=production
 
-# -H 127.0.0.1: chỉ nghe loopback, nginx là đường vào duy nhất. Thiếu cờ này thì
-# next start nghe 0.0.0.0, và http://IP:3000 đi vòng qua cả https lẫn WAF.
-# Đặt bằng cờ dòng lệnh chứ không bằng biến HOSTNAME: `next start` chỉ tài liệu
-# hoá biến PORT, còn hostname thì đọc từ tham số.
-ExecStart=/usr/bin/npm start -- -H 127.0.0.1 -p 3000
+# Node cài bằng nvm nên nằm trong home, không có trong PATH của systemd.
+# Đổi phiên bản node (nvm install) thì phải sửa lại hai dòng này.
+Environment=PATH=/home/talosmine/.nvm/versions/node/v25.2.1/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/talosmine/.nvm/versions/node/v25.2.1/bin/npm start -- -H 0.0.0.0 -p 4000
+
+# Cổng 4000 chứ không phải 3000: 3000 đã bị container talosmine-web chiếm.
+#
+# Nghe 0.0.0.0 chứ không phải loopback, vì máy aaPanel ở LAN phải proxy vào được.
+# Máy này không có IP công cộng nên cổng chỉ lộ ra 192.168.79.0/24; muốn chặt hơn
+# thì thêm luật iptables chỉ cho IP của máy aaPanel — xem deploy/README.md mục 6.
 
 Restart=always
 RestartSec=5
@@ -35,11 +40,10 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=kolo-pay
 
-# Không cho tiến trình web ghi ra ngoài thư mục của nó.
+# ProtectHome đã bỏ: mã nguồn VÀ node đều nằm trong /home/talosmine, bật lên là
+# service chết ngay lúc khởi động vì không thấy thư mục.
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target
