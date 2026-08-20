@@ -16,7 +16,10 @@ Wants=network-online.target
 Type=simple
 User=www
 Group=www
-WorkingDirectory=/www/wwwroot/demo.bboapp.xyz
+# Cùng thư mục với kolo-pay: hai tiến trình chạy từ một checkout, đọc chung
+# .env.local. Tách ra thư mục riêng thì đổi dòng này VÀ đổi User=/Group= sang
+# một user riêng — xem deploy/README.md mục 7, tách nửa vời không được gì.
+WorkingDirectory=/www/wwwroot/pay.bboapp.xyz
 
 # Không đặt NODE_ENV=production: server.ts là TypeScript chạy trực tiếp, không
 # qua bước build, và biến này không đổi gì ở phía nó. Cấu hình nằm ở .env.local

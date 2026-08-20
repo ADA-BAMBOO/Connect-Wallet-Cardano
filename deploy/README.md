@@ -4,6 +4,7 @@ Hai subdomain, hai tiến trình Node, một nginx đứng trước, mạng **ma
 
 ```
                     ┌──────────────── VPS (aaPanel) ────────────────┐
+                    │   một thư mục /www/wwwroot/pay.bboapp.xyz      │
   demo.bboapp.xyz ──┤ nginx :443 ──► 127.0.0.1:4100  shop demo      │
                     │                    │  ① tạo đơn (khoá API)    │
                     │                    ▼                          │
@@ -85,20 +86,29 @@ aaPanel → **App Store**: cài **PostgreSQL 14+** và **Redis 6+**.
 Redis không phải thứ tuỳ chọn ở đây: nó giữ cache tỷ giá ADA, khoá watcher và nonce
 đăng nhập.
 
-## 4. Mã nguồn — hai thư mục riêng
+## 4. Mã nguồn — một thư mục, hai tiến trình
 
 ```bash
 cd /www/wwwroot
 git clone https://github.com/ADA-BAMBOO/Connect-Wallet-Cardano.git pay.bboapp.xyz
-git clone https://github.com/ADA-BAMBOO/Connect-Wallet-Cardano.git demo.bboapp.xyz
-chown -R www:www pay.bboapp.xyz demo.bboapp.xyz
+chown -R www:www pay.bboapp.xyz
 ```
 
-Hai checkout của cùng một repo, không phải một. `demo/kolo-shop/server.ts` nạp
-`.env.local` ở **gốc repo của chính nó**; chung thư mục thì tiến trình demo cầm luôn
-`SESSION_SECRET`, chuỗi kết nối Postgres và Blockfrost key của cổng thanh toán, trong khi
-nó chỉ cần hai khoá. Tốn thêm ~500 MB đĩa, đổi lại một lỗi ở trang demo không với tới nơi
-giữ tiền.
+Cả hai tiến trình chạy từ thư mục này: `npm start` phục vụ pay.bboapp.xyz, còn
+`npm run demo:shop` phục vụ demo.bboapp.xyz. Chúng dùng chung một `node_modules`, một
+`.env.local`, và một lần `git pull` — nên không bao giờ có chuyện hai bên lệch phiên
+bản thuật toán ký webhook, thứ mà triệu chứng (401 hàng loạt) không hề chỉ về nguyên
+nhân.
+
+Thư mục site `demo.bboapp.xyz` mà aaPanel tạo vẫn giữ nguyên, để trống — nginx chỉ cần
+nó làm chỗ xác thực ACME lúc gia hạn chứng chỉ. Không có mã nguồn nào nằm ở đó.
+
+**Đánh đổi, nói cho rõ:** `demo/kolo-shop/server.ts` nạp `.env.local` ở gốc repo, nên
+tiến trình demo đọc được toàn bộ biến của cổng thanh toán — `SESSION_SECRET`, chuỗi kết
+nối Postgres, Blockfrost key — trong khi nó chỉ cần hai khoá. Tách thành hai thư mục
+cũng **không** sửa được điều này nếu cả hai tiến trình cùng chạy dưới user `www`: tiến
+trình demo đọc thẳng file của thư mục kia. Muốn cách ly thật thì phải cho trang demo một
+**user hệ thống riêng** — xem mục 7.
 
 **Node.** Cần **Node 22.6+** — trang demo chạy thẳng file `.ts`, dựa vào type stripping
 của Node. Node 24 LTS là lựa chọn an toàn. aaPanel cài Node qua App Store → Node.js
@@ -121,40 +131,41 @@ cd /www/wwwroot/pay.bboapp.xyz
 npm ci
 npm run migrate      # tạo bảng; chạy được nhiều lần, có khoá chống chạy song song
 npm run build
-
-cd /www/wwwroot/demo.bboapp.xyz
-npm ci               # không build, không migrate
 ```
+
+**Đừng dùng `--omit=dev`.** `demo/kolo-shop/server.ts` import `@next/env` để đọc
+`.env.local`, mà gói đó nằm trong `devDependencies` — bỏ dev là tiến trình demo chết ngay
+lúc khởi động. `next build` cũng cần TypeScript và Tailwind.
 
 `npm run migrate` cần `.env.local` đã có `DATABASE_URL` — làm mục 5 trước rồi quay lại
 đây. `npm run migrate -- --status` liệt kê mà không đụng gì.
 
 ## 5. Biến môi trường
 
-Chép hai template trong [`env/`](env/) thành `.env.local` ở gốc từng thư mục:
+Một file duy nhất, cả hai tiến trình cùng đọc:
 
 ```bash
-cp /www/wwwroot/pay.bboapp.xyz/deploy/env/pay.bboapp.xyz.env.example \
-   /www/wwwroot/pay.bboapp.xyz/.env.local
-
-cp /www/wwwroot/demo.bboapp.xyz/deploy/env/demo.bboapp.xyz.env.example \
-   /www/wwwroot/demo.bboapp.xyz/.env.local
-
-chmod 600 /www/wwwroot/*/.env.local
-chown www:www /www/wwwroot/*/.env.local
+cd /www/wwwroot/pay.bboapp.xyz
+cp deploy/env/pay.bboapp.xyz.env.example .env.local
+chmod 600 .env.local && chown www:www .env.local
 ```
 
-Điền theo chú thích trong file. Bốn giá trị **bắt buộc khớp nhau giữa hai bên**, lệch một
-ký tự là hỏng theo kiểu khó đoán:
+Điền theo chú thích trong file. Khối `KOLO_*` ở cuối file là phần của trang demo — nó nằm
+chung ở đây vì hai tiến trình dùng chung thư mục.
 
-| pay.bboapp.xyz | demo.bboapp.xyz | Lệch thì sao |
+Bốn giá trị phải **trỏ đúng vào nhau**, lệch một ký tự là hỏng theo kiểu khó đoán:
+
+| Biến | Giá trị | Sai thì sao |
 |---|---|---|
-| `MERCHANT_API_KEYS` (khoá đầu tiên) | `MERCHANT_API_KEYS` | Shop gọi tạo đơn nhận 401 |
-| `MERCHANT_WEBHOOK_SECRET` | `MERCHANT_WEBHOOK_SECRET` | Webhook tới nơi nhưng bị từ chối 401 — đơn "đã trả" mà shop không giao hàng |
-| `MERCHANT_RETURN_URL_ORIGINS` = `https://demo.bboapp.xyz` | `KOLO_SHOP_URL` = `https://demo.bboapp.xyz` | Tạo đơn bị từ chối vì returnUrl không nằm trong allowlist |
-| `PAYMENT_PUBLIC_URL` = `https://pay.bboapp.xyz` | `KOLO_PAY_URL` = `https://pay.bboapp.xyz` | Khách bị đưa tới link `localhost` |
+| `PAYMENT_PUBLIC_URL` | `https://pay.bboapp.xyz` | Khách bị đưa tới link `localhost` |
+| `KOLO_PAY_URL` | `https://pay.bboapp.xyz` | Trang demo gọi vào hư không |
+| `KOLO_SHOP_URL` | `https://demo.bboapp.xyz` | returnUrl trỏ sai chỗ |
+| `MERCHANT_RETURN_URL_ORIGINS` | phải **chứa** `https://demo.bboapp.xyz` | Tạo đơn bị từ chối vì returnUrl không nằm trong allowlist |
 
 So khớp **chính xác**: `https` chứ không `http`, không dấu `/` ở cuối, đúng subdomain.
+
+`MERCHANT_API_KEYS` và `MERCHANT_WEBHOOK_SECRET` giờ chỉ khai một lần — trang demo đọc
+đúng file này, nên không còn cửa để hai bên lệch nhau.
 
 **`TRUSTED_PROXY_HOPS`** — số proxy tin cậy đứng trước app. Chỉ nginx của aaPanel thì
 `1`; thêm Cloudflare bật proxy thì `2`. Đặt sai thì hạn mức theo IP hoặc mất tác dụng
@@ -199,11 +210,11 @@ Hai lựa chọn, **chọn một**. Chạy cả hai thì bản khởi động sa
 và triệu chứng trông y hệt "deploy không ăn".
 
 **Cách A — trình quản lý Node của aaPanel (PM2).** App Store → Node.js Project → Add
-project:
+project. Hai project, **cùng một thư mục**:
 
-| | pay.bboapp.xyz | demo.bboapp.xyz |
+| | Cổng thanh toán | Trang demo |
 |---|---|---|
-| Thư mục | `/www/wwwroot/pay.bboapp.xyz` | `/www/wwwroot/demo.bboapp.xyz` |
+| Thư mục | `/www/wwwroot/pay.bboapp.xyz` | `/www/wwwroot/pay.bboapp.xyz` |
 | Lệnh chạy | `npm start` | `npm run demo:shop` |
 | Cổng | 3000 | 4100 |
 | Tự khởi động | bật | bật |
@@ -227,6 +238,20 @@ Kiểm tra hai tiến trình đã nghe đúng chỗ trước khi đi tiếp:
 curl -sI http://127.0.0.1:3000 | head -1
 curl -sI http://127.0.0.1:4100 | head -1
 ```
+
+**Nếu sau này muốn cách ly thật sự trang demo.** Bố cục một thư mục không làm được điều
+đó, kể cả khi cho trang demo một user riêng: nó cần đọc `.env.local` để lấy hai khoá, mà
+file đó cũng chính là nơi giữ `SESSION_SECRET` và mật khẩu Postgres. Muốn tách thì phải
+tách cả ba thứ cùng lúc —
+
+1. checkout riêng ở `/www/wwwroot/demo.bboapp.xyz`,
+2. `.env.local` riêng, chỉ có khối `KOLO_*` cùng `MERCHANT_API_KEYS` và
+   `MERCHANT_WEBHOOK_SECRET` (dùng [`env/demo.bboapp.xyz.env.example`](env/demo.bboapp.xyz.env.example)),
+3. user hệ thống riêng (`useradd -r -s /usr/sbin/nologin kolo-demo`), đặt vào
+   `User=`/`Group=` của `kolo-demo.service` và `chown` thư mục đó cho user ấy.
+
+Thiếu bước 3 thì hai bước đầu chỉ là dọn dẹp cho gọn: hai tiến trình cùng chạy dưới `www`
+thì bên nào cũng đọc được file của bên kia.
 
 ## 8. Watcher
 
@@ -332,15 +357,18 @@ npm run verify:api https://pay.bboapp.xyz
 **Khi cập nhật mã nguồn:**
 
 ```bash
-cd /www/wwwroot/pay.bboapp.xyz && git pull && npm ci && npm run migrate && npm run build
-systemctl restart kolo-pay
-
-cd /www/wwwroot/demo.bboapp.xyz && git pull && npm ci
-systemctl restart kolo-demo
+cd /www/wwwroot/pay.bboapp.xyz
+git pull && npm ci && npm run migrate && npm run build
+systemctl restart kolo-pay kolo-demo
 ```
 
+Một thư mục nên chỉ một lượt pull, và hai tiến trình luôn cùng phiên bản — không có cửa
+để bên này ký webhook bằng thuật toán mà bên kia chưa biết.
+
 `next build` chạy khi tiến trình cũ vẫn đang phục vụ, nên trang chỉ gián đoạn vài giây
-lúc restart. Có migration mới thì chạy `npm run migrate` **trước** khi restart.
+lúc restart. Có migration mới thì chạy `npm run migrate` **trước** khi restart. Nhớ
+restart cả `kolo-demo`: nó chạy thẳng file `.ts` nên không cần build, nhưng mã cũ vẫn
+nằm trong RAM cho tới khi khởi động lại.
 
 ## Những chỗ hành xử khác lúc chạy ở localhost
 
