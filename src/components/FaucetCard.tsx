@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useNetwork, useWallet } from "@meshsdk/react";
+import { useWallet } from "@meshsdk/react";
 
 import { Alert, Badge, Button, Card, Field, inputClass } from "./ui";
 import { describeError, readJsonResponse } from "@/lib/errors";
 import { truncate } from "@/lib/format";
+import { useNetworkId } from "@/lib/use-wallet-data";
 
 /**
  * Thẻ faucet — người test tự lấy stablecoin thử.
@@ -59,7 +60,7 @@ function formatDuration(seconds: number): string {
 
 export function FaucetCard() {
   const { wallet, connected } = useWallet();
-  const networkId = useNetwork();
+  const networkId = useNetworkId();
 
   const [status, setStatus] = useState<FaucetStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);

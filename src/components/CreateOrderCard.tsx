@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useNetwork } from "@meshsdk/react";
 
 import { Alert, Badge, Button, Card, CopyableField, Field, inputClass } from "./ui";
 import { PaymentQr } from "./PaymentQr";
+import { useNetworkId } from "@/lib/use-wallet-data";
 
 /**
  * Thẻ tạo đơn thanh toán, dành cho phía người bán.
@@ -25,7 +25,7 @@ type CreatedOrder = {
 type HealthNetwork = { network: string; enabled: boolean };
 
 export function CreateOrderCard() {
-  const walletNetworkId = useNetwork();
+  const walletNetworkId = useNetworkId();
 
   const [networks, setNetworks] = useState<string[] | null>(null);
   const [network, setNetwork] = useState<string>("");

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useLovelace, useNetwork, useWallet } from "@meshsdk/react";
+import { useWallet } from "@meshsdk/react";
 import { Alert, Button, Card, Field, inputClass } from "./ui";
 import { adaToLovelace, lovelaceToAda, truncate } from "@/lib/format";
 import { addressMatchesNetwork, getNetworkInfo, txUrl } from "@/lib/network";
 import { describeError, isUserDeclined } from "@/lib/errors";
+import { useLovelace, useNetworkId } from "@/lib/use-wallet-data";
 
 /** Cardano yêu cầu mỗi UTxO phải chứa tối thiểu ~1 ADA (min-ADA / minUTxOValue). */
 const MIN_LOVELACE = 1_000_000n;
@@ -13,7 +14,7 @@ const MIN_LOVELACE = 1_000_000n;
 export function SendAdaCard() {
   const { wallet, connected } = useWallet();
   const balance = useLovelace();
-  const networkId = useNetwork();
+  const networkId = useNetworkId();
   const network = getNetworkInfo(networkId);
 
   const [recipient, setRecipient] = useState("");

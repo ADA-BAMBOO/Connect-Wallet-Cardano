@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAddress, useLovelace, useNetwork, useWallet } from "@meshsdk/react";
+import { useWallet } from "@meshsdk/react";
 import { Alert, Badge, Card, CopyableField, Spinner } from "./ui";
 import { addressUrl, getNetworkInfo } from "@/lib/network";
 import { lovelaceToAda, truncate } from "@/lib/format";
+import { useLovelace, useNetworkId, useWalletAddress } from "@/lib/use-wallet-data";
 
 export function AccountCard() {
   const { wallet, connected } = useWallet();
-  const address = useAddress();
+  const address = useWalletAddress();
   const lovelace = useLovelace();
-  const networkId = useNetwork();
+  const networkId = useNetworkId();
 
   const [stakeAddress, setStakeAddress] = useState<string | null>(null);
   const [utxoCount, setUtxoCount] = useState<number | null>(null);

@@ -52,6 +52,21 @@ export function isUserDeclined(err: unknown, kind: "data" | "tx"): boolean {
 }
 
 /**
+ * true nếu ví đang chặn vì bị gọi quá dày ("too many requests").
+ *
+ * Extension ví tự đặt rate limit cho API CIP-30 của mình — Eternl ném lỗi này từ
+ * `getApiError` trong content script. Đây là lỗi TẠM THỜI: chờ một nhịp rồi gọi
+ * lại là được, nên đừng hiển thị nó như lỗi cứng và đừng bắt người dùng thao tác
+ * lại từ đầu.
+ *
+ * Không dựa vào mã lỗi: CIP-30 không có mã riêng cho rate limit, ví nhét nó vào
+ * APIError.InternalError (-2) — mà -2 còn dùng cho đủ thứ lỗi khác nữa.
+ */
+export function isRateLimited(err: unknown): boolean {
+  return /too many requests|rate.?limit|throttl|429/i.test(describeError(err, ""));
+}
+
+/**
  * true nếu ví không ký được bằng địa chỉ này (DataSignError.AddressNotPK = 2),
  * tức là nên thử fallback sang địa chỉ khác thay vì báo lỗi cho người dùng.
  */

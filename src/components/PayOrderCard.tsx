@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useNetwork, useWallet, useWalletList } from "@meshsdk/react";
+import { useWallet, useWalletList } from "@meshsdk/react";
 
 import { ConnectWallet } from "./ConnectWallet";
 import { PaymentQr } from "./PaymentQr";
@@ -10,6 +10,7 @@ import { Alert, Badge, Button, Card, CopyableField, Spinner } from "./ui";
 import { describeError, isUserDeclined } from "@/lib/errors";
 import { cip13PaymentUri } from "@/lib/cip13";
 import { truncate } from "@/lib/format";
+import { useNetworkId } from "@/lib/use-wallet-data";
 
 /**
  * Trang thanh toán: chọn token, ký, rồi theo dõi cho tới khi đơn được xác nhận.
@@ -86,7 +87,7 @@ export type OrderView = { order: Order; tokens: TokenOption[] };
 export function PayOrderCard({ orderRef, initial }: { orderRef: string; initial: OrderView }) {
   const { wallet, connected } = useWallet();
   const walletList = useWalletList();
-  const walletNetworkId = useNetwork();
+  const walletNetworkId = useNetworkId();
 
   // Dữ liệu ban đầu do server component đưa xuống, nên không có trạng thái "đang
   // tải" nào cả — người trả tiền thấy số tiền ngay từ lần render đầu.

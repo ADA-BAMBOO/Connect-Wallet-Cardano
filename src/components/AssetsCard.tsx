@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAssets, useNetwork, useWallet } from "@meshsdk/react";
+import { useWallet } from "@meshsdk/react";
 import { Alert, Badge, Card, Spinner } from "./ui";
 import {
   colorFromString,
@@ -11,13 +11,14 @@ import {
   truncate,
 } from "@/lib/format";
 import { getNetworkInfo } from "@/lib/network";
+import { useAssets, useNetworkId } from "@/lib/use-wallet-data";
 
 type AssetMeta = { unit: string; name?: string; images?: string[]; decimals?: number };
 
 export function AssetsCard() {
   const { connected } = useWallet();
   const assets = useAssets();
-  const networkId = useNetwork();
+  const networkId = useNetworkId();
   const network = getNetworkInfo(networkId);
 
   const [meta, setMeta] = useState<Record<string, AssetMeta>>({});
