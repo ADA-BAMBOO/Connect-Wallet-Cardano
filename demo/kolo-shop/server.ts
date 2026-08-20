@@ -4,7 +4,7 @@
  * Đây là "dự án bán hàng" trong sơ đồ ở docs/INTEGRATION.md: một service riêng, chạy
  * ở cổng riêng, gọi sang cổng thanh toán qua HTTP y như Kolo thật sẽ làm.
  *
- *   localhost:3100 (Kolo giả lập)            localhost:3000 (Kolo Pay)
+ *   localhost:4100 (Kolo giả lập)            localhost:3000 (Kolo Pay)
  *   ─────────────────────────────            ─────────────────────────────
  *     ① POST /mua ──────────────────────────►  POST /api/v1/orders
  *     ② redirect khách ─────────────────────►  /pay/<ref>  → khách ký bằng ví
@@ -54,7 +54,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const gatewayRoot = path.resolve(here, "../..");
 nextEnv.loadEnvConfig(gatewayRoot, true);
 
-const PORT = Number(process.env.KOLO_SHOP_PORT ?? 3100);
+const PORT = Number(process.env.KOLO_SHOP_PORT ?? 4100);
 const SHOP_URL = process.env.KOLO_SHOP_URL ?? `http://localhost:${PORT}`;
 const PAY_URL =
   process.env.KOLO_PAY_URL ?? process.env.PAYMENT_PUBLIC_URL ?? "http://localhost:3000";

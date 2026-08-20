@@ -40,7 +40,7 @@ npm run migrate    # tạo bảng
 ```
 
 Muốn xem trọn luồng shop → cổng thanh toán → shop: [`demo/README.md`](demo/README.md)
-dựng một trang Kolo giả lập ở `localhost:3100` và chạy hết vòng bằng `npm run demo:shop`.
+dựng một trang Kolo giả lập ở `localhost:4100` và chạy hết vòng bằng `npm run demo:shop`.
 
 Để thử nghiệm an toàn: chuyển ví sang **Preprod** hoặc **Preview** testnet, rồi
 xin ADA miễn phí tại [Cardano Testnet Faucet](https://docs.cardano.org/cardano-testnets/tools/faucet/).
@@ -206,13 +206,18 @@ thông báo "chữ ký không khớp" không hề chỉ về nguyên nhân.
 Chạy được với cả dev server lẫn production:
 
 ```bash
-npm run verify:browser http://localhost:3100
+npm run verify:browser http://localhost:3000
 ```
 
 Cả ba script đều chạy được trên production build — nên dùng để kiểm tra trước khi
 deploy, vì có những lỗi chỉ xuất hiện ở `next start` chứ không có ở `next dev`.
 
 ## Triển khai
+
+Mục này là checklist chung, không gắn với nền tảng nào. Bản đi theo từng bước cho một
+VPS chạy aaPanel — hai subdomain `pay.` và `demo.`, nginx, systemd, cron watcher, trình
+tự bật mainnet — nằm ở [`deploy/README.md`](deploy/README.md), kèm sẵn file nginx, unit
+systemd và template biến môi trường.
 
 ### 1. Hạ tầng cần có
 

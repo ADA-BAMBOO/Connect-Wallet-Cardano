@@ -28,7 +28,7 @@ if (!shopOrderId) {
   process.exit(1);
 }
 
-const url = process.env.MERCHANT_WEBHOOK_URL ?? "http://localhost:3100/api/webhooks/kolo-pay";
+const url = process.env.MERCHANT_WEBHOOK_URL ?? "http://localhost:4100/api/webhooks/kolo-pay";
 const secret = process.env.MERCHANT_WEBHOOK_SECRET ?? "";
 
 if (!secret) {

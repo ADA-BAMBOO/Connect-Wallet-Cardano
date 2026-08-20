@@ -1,0 +1,19 @@
+# /etc/systemd/system/kolo-watcher.service
+#
+# Chạy một lượt quét. Không enable service này — nó do timer gọi.
+#
+# Không có watcher thì KHÔNG đơn nào chuyển sang `confirmed`: trang /pay tự làm
+# mới được khi có người đang mở tab, nhưng khoản trả bằng QR từ máy khác thì
+# không ai nhìn. Lượt quét này cũng là đường bảo đảm duy nhất để webhook về được
+# trang shop — mọi đường khác đều có thể không xảy ra.
+
+[Unit]
+Description=Kolo Pay watcher — quet on-chain va day hang doi webhook
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/kolo-watcher.env
+ExecStart=/usr/bin/curl -fsS --max-time 60 -X POST \
+  https://pay.bboapp.xyz/api/payments/watcher \
+  -H "authorization: Bearer ${PAYMENT_WATCHER_SECRET}" \
+  -o /dev/null

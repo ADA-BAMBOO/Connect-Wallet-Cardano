@@ -1,0 +1,22 @@
+# /etc/systemd/system/kolo-watcher.timer
+#
+#   printf 'PAYMENT_WATCHER_SECRET=...\n' > /etc/kolo-watcher.env
+#   chmod 600 /etc/kolo-watcher.env
+#   systemctl daemon-reload && systemctl enable --now kolo-watcher.timer
+#   systemctl list-timers kolo-watcher    ← xem lần chạy kế tiếp
+#
+# 15 giây thay vì cron mỗi phút: khách đứng nhìn thanh tiến trình, và một phút
+# chờ sau khi giao dịch đã lên chain là một phút họ nghĩ hệ thống treo.
+# Gọi chồng nhau không sao — mỗi đơn được bọc trong một khoá Redis.
+
+[Unit]
+Description=Goi Kolo Pay watcher moi 15 giay
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=15
+AccuracySec=1s
+Unit=kolo-watcher.service
+
+[Install]
+WantedBy=timers.target

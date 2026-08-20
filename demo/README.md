@@ -4,7 +4,7 @@ Kịch bản demo trọn luồng **shop → cổng thanh toán → shop**, dùng
 chạy ở cổng riêng. Không đụng gì tới bboapp.xyz production.
 
 ```
-  localhost:3100  (Kolo giả lập)            localhost:3000  (Kolo Pay)
+  localhost:4100  (Kolo giả lập)            localhost:3000  (Kolo Pay)
   ────────────────────────────              ────────────────────────────
     ① bấm "Thanh toán bằng Cardano" ──────►  POST /api/v1/orders   (khoá API)
     ② redirect ───────────────────────────►  /pay/<ref>  → khách ký bằng ví
@@ -52,7 +52,7 @@ Ba cửa sổ terminal:
 
 ```bash
 npm run dev          # cổng thanh toán  → localhost:3000
-npm run demo:shop    # Kolo giả lập     → localhost:3100
+npm run demo:shop    # Kolo giả lập     → localhost:4100
 ```
 
 Cửa sổ thứ ba để xem nhật ký — `npm run demo:shop` in ra từng bước ①③✓ khi chúng xảy ra.
@@ -82,7 +82,7 @@ trong log rồi dùng tiếng Việt, không sập.
 | | Làm gì | Người xem thấy gì |
 |---|---|---|
 | 1 | Mở **localhost:3000**, kết nối ví, mở thẻ *Faucet stablecoin thử*, bấm lấy token | Ví nhận tUSDM sau 20–60 giây |
-| 2 | Mở **localhost:3100** — đây là "Kolo" | Trang bán gói Kolo Pro, giá tính bằng USD |
+| 2 | Mở **localhost:4100** — đây là "Kolo" | Trang bán gói Kolo Pro, giá tính bằng USD |
 | 3 | Bấm **Thanh toán bằng Cardano** | Trình duyệt nhảy sang `localhost:3000/pay/<ref>` — sang cổng thanh toán, mang theo tên sản phẩm và số tiền |
 | 4 | Chọn tUSDM (hoặc ADA), bấm trả, ký trong popup ví | Thanh tiến trình: ký → phát lên mạng → vào block → đủ xác nhận |
 | 5 | Bấm **Quay lại Kolo** | Trang cảm ơn của Kolo: *Đã thanh toán*, có mã giao dịch, *Đã giao hàng: rồi* |
@@ -136,9 +136,9 @@ Nằm trong `.env.local` của cổng thanh toán:
 | Biến | Giá trị cho demo |
 |---|---|
 | `MERCHANT_API_KEYS` | Khoá shop dùng để gọi sang. Shop giả lập lấy khoá **đầu tiên**. |
-| `MERCHANT_WEBHOOK_URL` | `http://localhost:3100/api/webhooks/kolo-pay` |
+| `MERCHANT_WEBHOOK_URL` | `http://localhost:4100/api/webhooks/kolo-pay` |
 | `MERCHANT_WEBHOOK_SECRET` | Khoá ký webhook, hai bên phải giống nhau. |
-| `MERCHANT_RETURN_URL_ORIGINS` | Phải chứa `http://localhost:3100`. |
+| `MERCHANT_RETURN_URL_ORIGINS` | Phải chứa `http://localhost:4100`. |
 | `DEFAULT_LOCALE` | `en` để demo bằng tiếng Anh, bỏ trống để dùng tiếng Việt. |
 
 Đổi cổng của shop giả lập: `KOLO_SHOP_PORT=3200 npm run demo:shop` — nhớ sửa hai biến

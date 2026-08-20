@@ -1,0 +1,45 @@
+# /etc/systemd/system/kolo-pay.service
+#
+#   systemctl daemon-reload
+#   systemctl enable --now kolo-pay
+#   journalctl -u kolo-pay -f
+#
+# Dùng systemd thay cho trình quản lý Node của aaPanel (PM2) khi muốn log đi vào
+# journald và tiến trình sống lại sau khi reboot mà không phụ thuộc panel.
+# Chọn MỘT trong hai, đừng chạy cả hai — hai bản cùng nghe cổng 3000 thì bản sau
+# chết ngay lúc khởi động và triệu chứng trông như "deploy không ăn".
+
+[Unit]
+Description=Kolo Pay — cong thanh toan Cardano (pay.bboapp.xyz)
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/pay.bboapp.xyz
+
+# next start đọc .env.local trong WorkingDirectory, nên không cần EnvironmentFile.
+Environment=NODE_ENV=production
+
+# -H 127.0.0.1: chỉ nghe loopback, nginx là đường vào duy nhất. Thiếu cờ này thì
+# next start nghe 0.0.0.0, và http://IP:3000 đi vòng qua cả https lẫn WAF.
+# Đặt bằng cờ dòng lệnh chứ không bằng biến HOSTNAME: `next start` chỉ tài liệu
+# hoá biến PORT, còn hostname thì đọc từ tham số.
+ExecStart=/usr/bin/npm start -- -H 127.0.0.1 -p 3000
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kolo-pay
+
+# Không cho tiến trình web ghi ra ngoài thư mục của nó.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
