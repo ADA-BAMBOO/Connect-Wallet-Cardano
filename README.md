@@ -162,7 +162,7 @@ src/
     ├── verify-faucet.mjs       Faucet: trạng thái, các nhánh từ chối, xin thật
     ├── migrate.mjs             Chạy migration Postgres
     ├── resolve-stablecoin-units.mjs  Tra & đối chiếu unit thật trên mainnet
-    └── mint-test-stablecoins.mjs     Mint 4 token giả trên Preprod
+    └── mint-test-stablecoins.mjs     Mint 5 token giả trên Preprod
 ```
 
 ## Kiểm thử
@@ -688,7 +688,7 @@ cứng cả 4 unit lại để một lần sửa nhầm tay không lọt qua rev
 
 Testnet thì ngược lại: **không có** stablecoin thật, nên `stablecoins.ts` để trống và
 danh mục đến từ `STABLECOINS_PREPROD`. Token thử tự mint bằng
-[`mint-test-stablecoins.mjs`](scripts/mint-test-stablecoins.mjs) — cả 4 dùng chung một
+[`mint-test-stablecoins.mjs`](scripts/mint-test-stablecoins.mjs) — cả 5 dùng chung một
 policy native script "cần chữ ký của ví mint", và script in ra sẵn dòng env hoàn chỉnh:
 
 ```bash
@@ -1004,7 +1004,7 @@ giờ "hết token", chỉ có thể hết ADA. Token nào KHÔNG thuộc policy
 báo rõ nó còn bao nhiêu.
 
 `mintAsset` được gọi **không kèm `recipient`**. Truyền recipient thì Mesh tạo một output
-riêng cho từng token, mỗi output lại phải tự đạt min-ADA — 4 token thành ~5 ADA mỗi lượt
+riêng cho từng token, mỗi output lại phải tự đạt min-ADA — 5 token thành ~6 ADA mỗi lượt
 phát. Bỏ recipient đi thì token vừa đúc nằm trong giá trị giao dịch và một `sendAssets`
 duy nhất gom tất cả vào một output, tốn đúng một suất min-ADA.
 

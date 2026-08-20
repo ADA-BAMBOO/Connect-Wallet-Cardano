@@ -64,7 +64,7 @@ const DEFAULT_TOKEN_AMOUNT = "1000";
 /**
  * ADA kèm theo mỗi lượt phát.
  *
- * Không phải quà tặng: Cardano bắt mỗi output phải chứa min-ADA, và một output mang 4
+ * Không phải quà tặng: Cardano bắt mỗi output phải chứa min-ADA, và một output mang 5
  * native token cần khoảng 1,4 ADA. 2 ADA vừa đủ vượt ngưỡng đó, vừa để lại chút phí
  * cho người test gửi giao dịch trả tiền.
  */
@@ -616,7 +616,7 @@ export async function claimFaucet(input: ClaimInput): Promise<ClaimOutcome> {
       for (const item of plan) {
         if (item.mode !== "mint" || !item.assetName) continue;
         // KHÔNG truyền `recipient` cho mintAsset: nó sẽ tạo thêm một output riêng cho
-        // từng token, mà mỗi output lại phải tự đạt min-ADA — 4 token thành ~5 ADA mỗi
+        // từng token, mà mỗi output lại phải tự đạt min-ADA — 5 token thành ~6 ADA mỗi
         // lượt phát. Token vừa đúc nằm trong giá trị của giao dịch, và output bên dưới
         // gom tất cả vào một chỗ.
         tx.mintAsset(faucet.forgeScript, {

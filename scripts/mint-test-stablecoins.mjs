@@ -1,5 +1,5 @@
 /**
- * Mint 4 stablecoin GIẢ trên Preprod để thử luồng thanh toán.
+ * Mint 5 stablecoin GIẢ trên Preprod để thử luồng thanh toán.
  *
  *   npm run mint:test-stablecoins                  mint về chính ví mint
  *   npm run mint:test-stablecoins -- --to addr_test1…   mint về ví khác (vd Eternl của bạn)
@@ -10,7 +10,7 @@
  * testnet. Muốn thử trọn luồng thanh toán mà không tiêu tiền thật thì phải tự mint
  * token có cùng hình dạng (6 decimals, fungible) rồi khai vào STABLECOINS_PREPROD.
  *
- * Cả 4 token dùng CHUNG một policy native script "cần chữ ký của ví này" — đủ cho
+ * Cả 5 token dùng CHUNG một policy native script "cần chữ ký của ví này" — đủ cho
  * mục đích thử, và không có gì bí ẩn: bất kỳ ai cũng mint được token trùng tên, đó
  * chính là lý do mainnet phải chốt policy id trong code.
  */
@@ -43,9 +43,15 @@ const TOKENS = [
   { assetName: "tiUSD", ticker: "tiUSD", label: "Test iUSD", decimals: 6 },
   { assetName: "tDJED", ticker: "tDJED", label: "Test DJED", decimals: 6 },
   { assetName: "tUSDA", ticker: "tUSDA", label: "Test USDA", decimals: 6 },
+  // tUSDC khác bốn dòng trên: nó KHÔNG có bản thật trong danh mục mainnet ở
+  // src/lib/stablecoins.ts, vì Cardano chưa có USDC native nào qua được hai nguồn
+  // đối chiếu của `npm run resolve:stablecoins`. Ở đây nó chỉ là thêm một token cùng
+  // hình dạng (6 decimals, fungible) để có cái mà thử — muốn đưa USDC lên mainnet thì
+  // phải chạy script tra unit trước, không chép tay policy id từ đây sang.
+  { assetName: "tUSDC", ticker: "tUSDC", label: "Test USDC", decimals: 6 },
 ];
 
-/** Đủ cho phí + min-ADA của output mang 4 token. Dư ra để còn gửi đi thử. */
+/** Đủ cho phí + min-ADA của output mang 5 token. Dư ra để còn gửi đi thử. */
 const MIN_ADA_NEEDED = 10_000_000n;
 
 const FAUCET = "https://docs.cardano.org/cardano-testnets/tools/faucet/";
@@ -197,7 +203,7 @@ for (const token of TOKENS) {
 }
 
 /**
- * Metadata nhãn 20 (fungible token) gắn MỘT LẦN cho cả 4 token.
+ * Metadata nhãn 20 (fungible token) gắn MỘT LẦN cho cả 5 token.
  *
  * Không truyền `label`/`metadata` vào từng lời gọi `mintAsset`: một giao dịch chỉ có
  * một khối metadata cho mỗi nhãn, nên lần gọi sau ghi đè lần trước và cuối cùng chỉ
