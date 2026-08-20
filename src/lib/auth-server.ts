@@ -20,21 +20,41 @@ const nonceKey = (address: string) => `auth:nonce:${address}`;
 /* ------------------------------------------------------------------ */
 
 /**
- * Dự phòng khi chưa cấu hình Redis.
+ * Dự phòng khi chưa cấu hình Redis — hoặc khi Redis được cấu hình nhưng chết.
  *
  * Nonce nằm trong RAM của tiến trình thì mất sau mỗi lần restart và không chia sẻ
  * được giữa nhiều instance — sau load balancer, người dùng xin nonce ở instance A
  * rồi gửi chữ ký tới instance B sẽ luôn bị từ chối. Chấp nhận được khi chạy một
  * tiến trình lúc dev; production hãy đặt REDIS_URL.
+ *
+ * Treo trên globalThis chứ không để `const` trần ở module scope: `next dev` nạp
+ * lại module sau mỗi lần HMR, và một Map trần sẽ bị thay mới — nonce vừa ghi ở
+ * request trước biến mất. Đúng cái pattern mà lib/redis.ts dùng cho client Redis.
  */
 type NonceEntry = { nonce: string; expiresAt: number };
-const memoryStore = new Map<string, NonceEntry>();
+
+const globalForNonce = globalThis as unknown as { __authNonceStore?: Map<string, NonceEntry> };
+const memoryStore = (globalForNonce.__authNonceStore ??= new Map<string, NonceEntry>());
 
 function pruneExpired() {
   const now = Date.now();
   for (const [key, entry] of memoryStore) {
     if (entry.expiresAt <= now) memoryStore.delete(key);
   }
+}
+
+function saveNonceToMemory(address: string, nonce: string): void {
+  pruneExpired();
+  memoryStore.set(address, { nonce, expiresAt: Date.now() + NONCE_TTL_MS });
+}
+
+/** Đọc-và-xoá trong RAM. Xoá vô điều kiện: nonce dùng một lần, kể cả khi đã hết hạn. */
+function consumeNonceFromMemory(address: string): string | null {
+  pruneExpired();
+  const entry = memoryStore.get(address);
+  if (!entry) return null;
+  memoryStore.delete(address);
+  return entry.expiresAt > Date.now() ? entry.nonce : null;
 }
 
 export async function saveNonce(address: string, nonce: string): Promise<void> {
@@ -49,8 +69,7 @@ export async function saveNonce(address: string, nonce: string): Promise<void> {
     }
   }
 
-  pruneExpired();
-  memoryStore.set(address, { nonce, expiresAt: Date.now() + NONCE_TTL_MS });
+  saveNonceToMemory(address, nonce);
 }
 
 /**
@@ -59,24 +78,32 @@ export async function saveNonce(address: string, nonce: string): Promise<void> {
  * Trên Redis dùng GETDEL để đọc và xoá trong một thao tác nguyên tử. Nếu tách làm
  * GET rồi DEL, hai request đồng thời đều đọc được cùng một nonce trước khi nó bị
  * xoá — và thế là chống replay không còn tác dụng.
+ *
+ * PHẢI đối xứng với saveNonce. Trước đây nhánh Redis lỗi trả thẳng null với lý do
+ * "nonce đã ghi vào Redis thì không có trong RAM" — lý do đó sai đúng ở trường hợp
+ * hay xảy ra nhất: Redis chết thì saveNonce đã rơi về RAM, nên nonce nằm trong RAM
+ * thật. Kết quả là đăng nhập luôn hỏng với thông báo "Nonce đã hết hạn hoặc không
+ * tồn tại" trong khi nonce vẫn còn nguyên và hạn còn dài (REDIS_URL trỏ tới một
+ * Redis không chạy là đủ để dính).
+ *
+ * Tra RAM cả khi Redis *đọc được nhưng không thấy*: Redis có thể vừa sống lại giữa
+ * lúc xin nonce và lúc gửi chữ ký, khi đó nonce nằm ở RAM chứ không ở Redis.
+ *
+ * Không nới lỏng bảo mật: RAM chỉ có nonce do chính server ghi vào, và đọc là xoá
+ * nên vẫn đúng một lần. Một nonce chỉ tồn tại ở MỘT nơi, không có đường phục sinh
+ * nonce đã tiêu.
  */
 export async function consumeNonce(address: string): Promise<string | null> {
   if (isRedisConfigured()) {
     try {
-      return await getRedis().getdel(nonceKey(address));
+      const fromRedis = await getRedis().getdel(nonceKey(address));
+      if (fromRedis) return fromRedis;
     } catch (error) {
-      console.error("[auth] không đọc được nonce từ Redis:", error);
-      // Không rơi về RAM ở đây: nonce đã ghi vào Redis thì không có trong RAM, mà
-      // trả về một giá trị từ nguồn khác chỉ tạo ra nhầm lẫn.
-      return null;
+      console.error("[auth] không đọc được nonce từ Redis, thử bộ nhớ tiến trình:", error);
     }
   }
 
-  pruneExpired();
-  const entry = memoryStore.get(address);
-  if (!entry) return null;
-  memoryStore.delete(address);
-  return entry.expiresAt > Date.now() ? entry.nonce : null;
+  return consumeNonceFromMemory(address);
 }
 
 /**
