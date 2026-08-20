@@ -89,6 +89,10 @@ export const en: Dictionary = {
     utxoCount: (n: number) => ` · ${n} UTxO`,
     paymentAddress: "Receiving address (payment)",
     stakeAddress: "Stake address",
+    stakeUnavailable: "The wallet returned no stake address",
+    stakeFailed: (detail: string) => `Could not read the stake address: ${detail}`,
+    stakeFailedHint:
+      "Usually the wallet throttling a burst of requests, or the extension's bridge timing out. Reloading the page normally fixes it. If it stays empty, run Wallet diagnostics at the bottom of the page to see exactly what the wallet returns.",
     stakeNote1: "A payment address can change with every transaction, so the",
     stakeNote2: "stake address",
     stakeNote3:

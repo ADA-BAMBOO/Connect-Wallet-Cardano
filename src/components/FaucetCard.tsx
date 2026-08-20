@@ -6,7 +6,7 @@ import { useWallet } from "@meshsdk/react";
 import { Alert, Badge, Button, Card, Field, inputClass } from "./ui";
 import { describeError, readJsonResponse } from "@/lib/errors";
 import { truncate } from "@/lib/format";
-import { useNetworkId } from "@/lib/use-wallet-data";
+import { fetchChangeAddress, useNetworkId } from "@/lib/use-wallet-data";
 import { useDict } from "@/lib/i18n/client";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
@@ -103,16 +103,14 @@ export function FaucetCard() {
 
     let alive = true;
 
-    // `getChangeAddress()` của CIP-30 có ví trả Promise, có ví trả thẳng chuỗi
-    // (SometimesPromise trong Mesh) — `await` xử lý được cả hai.
-    void (async () => {
-      try {
-        const value = await wallet.getChangeAddress();
-        if (alive) setAddress((current) => current || value);
-      } catch {
-        // Không lấy được địa chỉ thì để trống — người dùng dán tay.
-      }
-    })();
+    // Đi qua cache của use-wallet-data thay vì tự gọi: thẻ Tài khoản cũng cần địa
+    // chỉ này, và hai lời gọi giống hệt nhau bắn cùng lúc chính là thứ làm ví chặn.
+    void fetchChangeAddress(wallet)
+      .then((value) => {
+        if (alive && value) setAddress((current) => current || value);
+      })
+      // Không lấy được địa chỉ thì để trống — người dùng dán tay.
+      .catch(() => {});
 
     return () => {
       alive = false;

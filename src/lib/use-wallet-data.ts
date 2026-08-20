@@ -148,6 +148,36 @@ const readAddress = async (wallet: Wallet): Promise<string | undefined> => {
   return used[0] ?? (await wallet.getChangeAddress()) ?? undefined;
 };
 
+/**
+ * Ví trả về MẢNG địa chỉ stake, nhưng một tài khoản CIP-30 chỉ có một. Lấy phần tử
+ * đầu ngay tại đây để mọi chỗ dùng nhận cùng một hình dạng dữ liệu.
+ *
+ * Mảng rỗng là chuyện có thật chứ không phải lỗi: ví chỉ-đọc thêm bằng địa chỉ, và
+ * một số ví phần cứng, không trả địa chỉ stake nào. Phân biệt với "hỏi ví thất bại"
+ * là việc của `error` trong WalletValue.
+ */
+const readStakeAddress = async (wallet: Wallet): Promise<string | undefined> => {
+  const rewards = await wallet.getRewardAddresses();
+  return rewards[0] ?? undefined;
+};
+
+const readChangeAddress = async (wallet: Wallet): Promise<string | undefined> =>
+  (await wallet.getChangeAddress()) ?? undefined;
+
+/*
+ * `await` chứ không trả thẳng: vài API CIP-30 trong Mesh khai kiểu `SometimesPromise`
+ * — có ví trả Promise, có ví trả thẳng giá trị. `await` san phẳng cả hai.
+ */
+const readUtxos = async (wallet: Wallet) => await wallet.getUtxos();
+
+/*
+ * Khoá cache dùng chung giữa hook và bản gọi trực tiếp bên dưới. Viết thành hằng số
+ * vì một chữ gõ lệch là hai lần hỏi ví thay vì một — mà đó chính là lỗi cả file này
+ * sinh ra để chặn, và nó không biểu hiện thành lỗi biên dịch.
+ */
+const STAKE_KEY = "stakeAddress";
+const CHANGE_KEY = "changeAddress";
+
 /* ------------------------------------------------------------------ */
 /* API công khai                                                       */
 /* ------------------------------------------------------------------ */
@@ -177,4 +207,47 @@ export function useAssets() {
 /** Cùng chữ ký trả về với `useAddress()` của Mesh. */
 export function useWalletAddress(): string | undefined {
   return useWalletValue("address", readAddress).value;
+}
+
+/**
+ * Địa chỉ stake — trả về cả `error` chứ không chỉ giá trị.
+ *
+ * Chỗ gọi PHẢI phân biệt được ba trạng thái, vì chúng cần ba câu trả lời khác nhau:
+ *
+ *   value=undefined, error=null   đang đọc, hoặc ví không có địa chỉ stake
+ *   value=undefined, error="…"    hỏi ví thất bại — nói cho người dùng biết
+ *   value="stake1…"               có địa chỉ
+ *
+ * Bản trước gộp cả ba vào một dấu gạch ngang trên giao diện, nên ví bị rate limit
+ * trông y hệt ví không có địa chỉ stake, và không có cách nào biết được là cái nào.
+ */
+export function useStakeAddress(): WalletValue<string | undefined> {
+  return useWalletValue(STAKE_KEY, readStakeAddress);
+}
+
+export function useChangeAddress(): WalletValue<string | undefined> {
+  return useWalletValue(CHANGE_KEY, readChangeAddress);
+}
+
+export function useUtxos() {
+  return useWalletValue("utxos", readUtxos);
+}
+
+/* ------------------------------------------------------------------ */
+/* Bản gọi trực tiếp — cho handler, không phải cho render              */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Luồng đăng nhập cần địa chỉ NGAY LÚC BẤM, không phải lúc render, nên nó không dùng
+ * được hook. Hai hàm dưới đi qua đúng cái cache của hook: thẻ Tài khoản đã đọc rồi
+ * thì đây là cache hit, ví không bị hỏi lần hai. Và nếu người dùng bấm trước khi
+ * thẻ kia đọc xong, cả hai cùng chờ MỘT lời gọi.
+ */
+
+export function fetchStakeAddress(wallet: Wallet): Promise<string | undefined> {
+  return readOnce(wallet, STAKE_KEY, () => readStakeAddress(wallet));
+}
+
+export function fetchChangeAddress(wallet: Wallet): Promise<string | undefined> {
+  return readOnce(wallet, CHANGE_KEY, () => readChangeAddress(wallet));
 }

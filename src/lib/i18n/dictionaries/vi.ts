@@ -93,6 +93,10 @@ export const vi = {
     utxoCount: (n: number) => ` · ${n} UTxO`,
     paymentAddress: "Địa chỉ nhận (payment)",
     stakeAddress: "Địa chỉ stake",
+    stakeUnavailable: "Ví không trả về địa chỉ stake",
+    stakeFailed: (detail: string) => `Không đọc được địa chỉ stake: ${detail}`,
+    stakeFailedHint:
+      "Thường là ví chặn vì bị hỏi quá dày, hoặc cầu nối của extension hết giờ. Tải lại trang là được. Nếu vẫn không có, chạy Chẩn đoán ví ở cuối trang để xem ví trả về đúng cái gì.",
     stakeNote1: "Địa chỉ payment có thể đổi theo từng giao dịch, nên",
     stakeNote2: "địa chỉ stake",
     stakeNote3:

@@ -75,7 +75,20 @@ function installMockWallet({ addresses, walletName, failFirst }) {
     unhandled.push(String(e.reason?.info ?? e.reason?.message ?? e.reason));
   });
 
-  let networkIdFailures = 0;
+  /*
+   * Đếm riêng cho từng phương thức, không dùng chung một biến.
+   *
+   * Bản trước chỉ chặn getNetworkId, nên mọi đường đọc địa chỉ chưa bao giờ được
+   * thử dưới rate limit — đúng cái đã để lọt lỗi mất địa chỉ stake lên production.
+   */
+  const failures = {};
+
+  const throttle = (name) => {
+    if ((failures[name] ?? 0) >= failFirst) return;
+    failures[name] = (failures[name] ?? 0) + 1;
+    // Đúng hình dạng lỗi CIP-30 của ví thật: object thuần, không phải Error.
+    throw { code: -2, info: "too many requests" };
+  };
 
   const count = (name, fn) => async (...args) => {
     calls[name] = (calls[name] ?? 0) + 1;
@@ -84,11 +97,7 @@ function installMockWallet({ addresses, walletName, failFirst }) {
 
   const api = {
     getNetworkId: count("getNetworkId", async () => {
-      if (networkIdFailures < failFirst) {
-        networkIdFailures++;
-        // Đúng hình dạng lỗi CIP-30 của ví thật: object thuần, không phải Error.
-        throw { code: -2, info: "too many requests" };
-      }
+      throttle("getNetworkId");
       return 0;
     }),
     getUtxos: count("getUtxos", async () => []),
@@ -97,7 +106,10 @@ function installMockWallet({ addresses, walletName, failFirst }) {
     getUsedAddresses: count("getUsedAddresses", async () => [addresses.base]),
     getUnusedAddresses: count("getUnusedAddresses", async () => []),
     getChangeAddress: count("getChangeAddress", async () => addresses.base),
-    getRewardAddresses: count("getRewardAddresses", async () => [addresses.reward]),
+    getRewardAddresses: count("getRewardAddresses", async () => {
+      throttle("getRewardAddresses");
+      return [addresses.reward];
+    }),
     getExtensions: count("getExtensions", async () => []),
     signTx: count("signTx", async () => ""),
     signData: count("signData", async () => ({ signature: "", key: "" })),
@@ -160,6 +172,22 @@ async function run({ label, failFirst, budget }) {
     .textContent()
     .catch(() => null);
 
+  /*
+   * Địa chỉ stake phải hiện ra, KỂ CẢ ở lượt ví chặn vì gọi quá dày.
+   *
+   * Đây từng là lỗi thật trên production: thẻ Tài khoản tự gọi getRewardAddresses()
+   * không qua hook, nên nó không được thử lại, và catch rỗng biến mọi thất bại thành
+   * một dấu gạch ngang — không ai phân biệt được "ví không có địa chỉ stake" với
+   * "hỏi ví hỏng". Bài này canh đúng chỗ đó: chuỗi 12 ký tự đầu của địa chỉ stake
+   * thật phải nằm trên màn hình.
+   */
+  const stakePrefix = rewardAddressBech32.slice(0, 12);
+  const stakeShown = await page
+    .getByText(stakePrefix, { exact: false })
+    .first()
+    .isVisible()
+    .catch(() => false);
+
   console.log(`\n--- ${label} ---`);
   console.log("  lời gọi CIP-30:", JSON.stringify(calls));
 
@@ -174,6 +202,7 @@ async function run({ label, failFirst, budget }) {
   assert(`${label}: không có promise rejection lọt ra ngoài`, unhandled.length, 0);
   assert(`${label}: không có lỗi runtime trên trang`, pageErrors.length, 0);
   assert(`${label}: trang vẫn hiện được mạng của ví`, /Testnet/.test(networkLabel ?? ""), "true");
+  assert(`${label}: trang hiện được địa chỉ stake`, stakeShown, true);
 
   if (unhandled.length) console.log("      rejection:", unhandled);
   if (pageErrors.length) console.log("      pageerror:", pageErrors);
@@ -187,11 +216,18 @@ console.log(`Base URL: ${BASE}`);
  * Ngưỡng đo được sau khi dồn các hook về `lib/use-wallet-data.ts`.
  * Để so sánh, đây là số của bản dùng hook gốc của Mesh:
  *   getNetworkId 10 · getBalance 6 · getUsedAddresses 2
+ *
+ * Bốn dòng dưới cùng từng KHÔNG có mặt ở đây, và đó là lý do chúng lặng lẽ trôi
+ * ngược lên (getRewardAddresses 2 · getUtxos 2 · getChangeAddress 3) khi các thẻ
+ * gọi thẳng `wallet.getX()` thay vì đi qua hook. Ngưỡng chỉ giữ được thứ nó đo.
  */
 const BUDGET = {
   getNetworkId: 1, // 5 thẻ cùng cần, ví chỉ được hỏi MỘT lần
   getBalance: 2, // useLovelace + useAssets, mỗi thứ một lần
   getUsedAddresses: 1,
+  getRewardAddresses: 1, // thẻ Tài khoản + luồng đăng nhập dùng chung một kết quả
+  getUtxos: 1,
+  getChangeAddress: 2, // useWalletAddress rơi về nó, + thẻ Faucet
 };
 
 // 1. Đường bình thường.
@@ -202,7 +238,8 @@ await run({ label: "ví bình thường", failFirst: 0, budget: BUDGET });
 await run({
   label: "ví trả 'too many requests' 2 lần đầu",
   failFirst: 2,
-  budget: { ...BUDGET, getNetworkId: 3 },
+  // 1 lời gọi thật + 2 lần bị chặn phải thử lại.
+  budget: { ...BUDGET, getNetworkId: 3, getRewardAddresses: 3 },
 });
 
 console.log(`\n${failures === 0 ? "Tất cả" : `${passes}/${passes + failures}`} kiểm tra đã pass.`);

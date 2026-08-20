@@ -10,6 +10,7 @@ import {
   isUserDeclined,
   readJsonResponse,
 } from "@/lib/errors";
+import { fetchChangeAddress, fetchStakeAddress } from "@/lib/use-wallet-data";
 import { useDict } from "@/lib/i18n/client";
 
 type Session = {
@@ -65,8 +66,13 @@ export function SignInCard() {
       // 1. Ưu tiên địa chỉ stake làm định danh — nó không đổi theo từng giao dịch.
       //    Đa số ví CIP-30 ký được bằng stake key, nhưng không phải tất cả, nên
       //    giữ sẵn payment address để fallback.
-      const [stakeAddress] = await wallet.getRewardAddresses();
-      const changeAddress = await wallet.getChangeAddress();
+      // Đi qua cache của use-wallet-data: thẻ Tài khoản phía trên đã đọc địa chỉ
+      // stake rồi, nên ở đây là cache hit — ví không bị hỏi lần thứ hai. Và nếu nó
+      // chưa đọc xong, cả hai cùng chờ MỘT lời gọi thay vì bắn hai.
+      const [stakeAddress, changeAddress] = await Promise.all([
+        fetchStakeAddress(wallet),
+        fetchChangeAddress(wallet),
+      ]);
 
       const candidates = [stakeAddress, changeAddress].filter(
         (a): a is string => typeof a === "string" && a.length > 0,

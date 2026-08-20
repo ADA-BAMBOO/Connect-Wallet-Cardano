@@ -1,50 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useWallet } from "@meshsdk/react";
 import { Alert, Badge, Card, CopyableField, Spinner } from "./ui";
 import { addressUrl, getNetworkInfo } from "@/lib/network";
 import { lovelaceToAda, truncate } from "@/lib/format";
-import { useLovelace, useNetworkId, useWalletAddress } from "@/lib/use-wallet-data";
+import {
+  useLovelace,
+  useNetworkId,
+  useStakeAddress,
+  useUtxos,
+  useWalletAddress,
+} from "@/lib/use-wallet-data";
 import { useDict } from "@/lib/i18n/client";
 
 export function AccountCard() {
-  const { wallet, connected } = useWallet();
   const t = useDict();
   const address = useWalletAddress();
   const lovelace = useLovelace();
   const networkId = useNetworkId();
 
-  const [stakeAddress, setStakeAddress] = useState<string | null>(null);
-  const [utxoCount, setUtxoCount] = useState<number | null>(null);
+  // Đi qua use-wallet-data thay vì tự gọi ví: ở đây trước kia là hai lời gọi CIP-30
+  // không ai gộp và không có thử lại, bắn ra đúng lúc mọi thẻ khác cũng đang hỏi ví.
+  const { value: stakeAddress, error: stakeError } = useStakeAddress();
+  const { value: utxos } = useUtxos();
+  const utxoCount = utxos?.length ?? null;
 
   const network = getNetworkInfo(networkId);
-
-  // Component này chỉ được render khi đã kết nối, và bị unmount khi ngắt kết nối,
-  // nên không cần reset state đồng bộ — chỉ cần huỷ request đang bay.
-  useEffect(() => {
-    if (!connected || !wallet) return;
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const [rewards, utxos] = await Promise.all([
-          wallet.getRewardAddresses(),
-          wallet.getUtxos(),
-        ]);
-        if (cancelled) return;
-        setStakeAddress(rewards[0] ?? null);
-        setUtxoCount(utxos.length);
-      } catch {
-        if (!cancelled) setStakeAddress(null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [wallet, connected]);
 
   return (
     <Card
@@ -112,9 +92,27 @@ export function AccountCard() {
           <CopyableField
             label={t.account.stakeAddress}
             value={stakeAddress ?? ""}
-            display={stakeAddress ? truncate(stakeAddress, 14, 8) : "—"}
+            display={
+              stakeAddress
+                ? truncate(stakeAddress, 14, 8)
+                : stakeError
+                  ? "—"
+                  : t.account.stakeUnavailable
+            }
           />
         </div>
+
+        {/*
+          Hỏi ví thất bại KHÔNG được hiện giống ví không có địa chỉ stake. Đây là
+          trạng thái sửa được — tải lại trang là xong — nên phải nói ra, kèm đường
+          đi tiếp. Trước đây cả hai trường hợp đều thành một dấu gạch ngang câm.
+        */}
+        {stakeError && (
+          <Alert tone="warning">
+            {t.account.stakeFailed(stakeError)}{" "}
+            <span className="text-fg-muted">{t.account.stakeFailedHint}</span>
+          </Alert>
+        )}
 
         <p className="text-xs leading-relaxed text-fg-subtle">
           {t.account.stakeNote1} <strong>{t.account.stakeNote2}</strong> {t.account.stakeNote3}
